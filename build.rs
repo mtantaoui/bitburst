@@ -28,19 +28,19 @@ impl CpuFeature {
     fn features() -> Vec<CpuFeature> {
         vec![
             CpuFeature {
-                name: "sse",
+                name: "sse41",
                 rustc_flag: "+sse4.1",
                 cfg_flag: "sse",
                 detected: false,
                 nightly_only: false,
             },
-            // CpuFeature {
-            //     name: "avx2",
-            //     rustc_flag: "+avx2",
-            //     cfg_flag: "avx2",
-            //     detected: false,
-            //     nightly_only: false,
-            // },
+            CpuFeature {
+                name: "avx2",
+                rustc_flag: "+avx2",
+                cfg_flag: "avx2",
+                detected: false,
+                nightly_only: false,
+            },
             CpuFeature {
                 name: "neon",
                 rustc_flag: "+neon",
@@ -56,7 +56,7 @@ impl CpuFeature {
     fn nightly_features() -> Vec<CpuFeature> {
         vec![
             CpuFeature {
-                name: "sse",
+                name: "sse41",
                 rustc_flag: "+sse4.1",
                 cfg_flag: "sse",
                 detected: false,
@@ -112,8 +112,6 @@ impl CpuFeatureDetector for LinuxDetector {
         if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
             let contents = cpuinfo.to_lowercase();
             for feature in features.iter_mut() {
-                println!("Detecting: {}", feature.name);
-
                 feature.detected = contents.contains(feature.name);
             }
         }
