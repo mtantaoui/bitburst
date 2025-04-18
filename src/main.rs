@@ -1,3 +1,7 @@
+#[cfg(sse)]
+use bitburst::simd::sse::f32x4;
+
 fn main() {
-    println!("Hello, world!");
+    #[cfg(sse)]
+    say_hello()
 }
