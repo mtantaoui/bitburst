@@ -34,13 +34,13 @@ impl CpuFeature {
                 detected: false,
                 nightly_only: false,
             },
-            // CpuFeature {
-            //     name: "avx2",
-            //     rustc_flag: "+avx2",
-            //     cfg_flag: "avx2",
-            //     detected: false,
-            //     nightly_only: false,
-            // },
+            CpuFeature {
+                name: "avx2",
+                rustc_flag: "+avx2",
+                cfg_flag: "avx2",
+                detected: false,
+                nightly_only: false,
+            },
             CpuFeature {
                 name: "neon",
                 rustc_flag: "+neon",
@@ -236,16 +236,8 @@ fn main() {
         CpuFeature::features()
     };
 
-    // Determine if we're cross-compiling
-    let host = env::var("HOST").unwrap_or_default();
-    let target = env::var("TARGET").unwrap_or_default();
-
-    let is_native_build = host == target;
-
     // Only run CPU detection for native builds
-    if is_native_build {
-        PlatformDetector::detect_cpu_features(&mut features);
-    }
+    PlatformDetector::detect_cpu_features(&mut features);
 
     // Pass RUSTFLAGS for enabling target features
     PlatformDetector::apply(&mut features);
