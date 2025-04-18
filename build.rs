@@ -18,7 +18,7 @@ impl CpuFeature {
         match self.name {
             "avx512f" => 0,
             "avx2" => 1,
-            "sse41" => 2,
+            "sse4_1" => 2,
             _ => usize::MAX, // lowest priority by default
         }
     }
@@ -28,19 +28,19 @@ impl CpuFeature {
     fn features() -> Vec<CpuFeature> {
         vec![
             CpuFeature {
-                name: "sse41",
+                name: "sse4_1",
                 rustc_flag: "+sse4.1",
                 cfg_flag: "sse",
                 detected: false,
                 nightly_only: false,
             },
-            CpuFeature {
-                name: "avx2",
-                rustc_flag: "+avx2",
-                cfg_flag: "avx2",
-                detected: false,
-                nightly_only: false,
-            },
+            // CpuFeature {
+            //     name: "avx2",
+            //     rustc_flag: "+avx2",
+            //     cfg_flag: "avx2",
+            //     detected: false,
+            //     nightly_only: false,
+            // },
             CpuFeature {
                 name: "neon",
                 rustc_flag: "+neon",
@@ -56,7 +56,7 @@ impl CpuFeature {
     fn nightly_features() -> Vec<CpuFeature> {
         vec![
             CpuFeature {
-                name: "sse41",
+                name: "sse4_1",
                 rustc_flag: "+sse4.1",
                 cfg_flag: "sse",
                 detected: false,
@@ -135,7 +135,7 @@ impl CpuFeatureDetector for MacOSDetector {
                 match feature.name {
                     "avx512f" => feature.detected = contents.contains("hw.optional.avx512f: 1"),
                     "avx2" => feature.detected = contents.contains("hw.optional.avx2: 1"),
-                    "sse41" => feature.detected = contents.contains("hw.optional.sse4_1: 1"),
+                    "sse4_1" => feature.detected = contents.contains("hw.optional.sse4_1: 1"),
                     "neon" => feature.detected = contents.contains("hw.optional.neon: 1"),
                     _ => {}
                 }
