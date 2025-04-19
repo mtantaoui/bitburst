@@ -36,4 +36,14 @@ pub trait SimdVec<T> {
     unsafe fn store_at_partial(&self, ptr: *mut T);
 
     fn to_vec(self) -> Vec<T>;
+
+    fn eq_elements(&self, rhs: Self) -> Self;
+
+    fn lt_elements(&self, rhs: Self) -> Self;
+
+    fn le_elements(&self, rhs: Self) -> Self;
+
+    fn gt_elements(&self, rhs: Self) -> Self;
+
+    fn ge_elements(&self, rhs: Self) -> Self;
 }
