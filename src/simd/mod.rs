@@ -1,13 +1,13 @@
 #[cfg(all(avx512, rustc_channel = "nightly"))]
-mod avx512;
+pub mod avx512;
 
 #[cfg(avx2)]
-mod avx2;
+pub mod avx2;
 
 #[cfg(sse)]
-mod sse;
+pub mod sse;
 
 #[cfg(neon)]
-mod neon;
+pub mod neon;
 
-mod vec;
+pub mod vec;

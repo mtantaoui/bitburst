@@ -1,4 +1,4 @@
-pub(crate) trait SimdVec<T> {
+pub trait SimdVec<T> {
     fn new(slice: &[T]) -> Self;
 
     fn splat(value: T) -> Self;
