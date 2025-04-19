@@ -4,8 +4,8 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 use std::ops::{
-    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, Div, DivAssign, Not, Rem, RemAssign,
-    Sub, SubAssign,
+    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, Div, DivAssign, Mul, MulAssign, Not,
+    Rem, RemAssign, Sub, SubAssign,
 };
 
 use crate::simd::vec::SimdVec;
@@ -219,6 +219,45 @@ impl SubAssign for F32x4 {
     }
 }
 
+impl Mul for F32x4 {
+    type Output = Self;
+
+    #[inline]
+    fn mul(self, rhs: Self) -> Self::Output {
+        assert!(
+            self.size == rhs.size,
+            "Operands must have the same size (expected {} lanes, got {} and {})",
+            LANE_COUNT,
+            self.size,
+            rhs.size
+        );
+
+        unsafe {
+            F32x4 {
+                size: self.size,
+                elements: _mm_mul_ps(self.elements, rhs.elements),
+            }
+        }
+    }
+}
+
+impl MulAssign for F32x4 {
+    #[inline]
+    fn mul_assign(&mut self, rhs: Self) {
+        assert!(
+            self.size == rhs.size,
+            "Operands must have the same size (expected {} lanes, got {} and {})",
+            LANE_COUNT,
+            self.size,
+            rhs.size
+        );
+
+        unsafe {
+            self.elements = _mm_mul_ps(self.elements, rhs.elements);
+        }
+    }
+}
+
 impl Div for F32x4 {
     type Output = Self;
 
@@ -274,8 +313,9 @@ impl Rem for F32x4 {
         unsafe {
             let div = _mm_div_ps(self.elements, rhs.elements);
             let floor = _mm_floor_ps(div);
+            let prod = _mm_mul_ps(floor, rhs.elements);
 
-            let elements = _mm_sub_ps(div, floor);
+            let elements = _mm_sub_ps(self.elements, prod);
 
             F32x4 {
                 size: self.size,
@@ -299,8 +339,9 @@ impl RemAssign for F32x4 {
         unsafe {
             let div = _mm_div_ps(self.elements, rhs.elements);
             let floor = _mm_floor_ps(div);
+            let prod = _mm_mul_ps(floor, rhs.elements);
 
-            self.elements = _mm_sub_ps(div, floor);
+            self.elements = _mm_sub_ps(self.elements, prod);
         }
     }
 }
@@ -559,5 +600,202 @@ mod f32x4_tests {
             vec![11.0, 12.0, 13.0, 14.0, 15.0, 1.0, 17.0, 18.0, 19.0, 22.0],
             a1
         );
+    }
+
+    #[test]
+    fn test_add() {
+        let v1 = F32x4::new(&[1.0]);
+        let u1 = F32x4::new(&[5.0]);
+
+        assert_eq!(vec![6.0], (u1 + v1).to_vec());
+
+        let v2 = F32x4::new(&[1.0, 10.0]);
+        let u2 = F32x4::new(&[5.0, 11.0]);
+
+        assert_eq!(vec![6.0, 21.0], (u2 + v2).to_vec());
+
+        let v3 = F32x4::new(&[1.0, 10.0, 7.0]);
+        let u3 = F32x4::new(&[5.0, 11.0, 9.0]);
+
+        assert_eq!(vec![6.0, 21.0, 16.0], (u3 + v3).to_vec());
+
+        let v4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let u4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+
+        assert_eq!(vec![6.0, 21.0, 16.0, 7.0], (u4 + v4).to_vec());
+
+        let v5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let u5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+
+        assert_eq!(vec![6.0, 21.0, 16.0, 7.0], (u5 + v5).to_vec());
+    }
+
+    #[test]
+    fn test_add_assign() {
+        let mut a = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
+        let b = F32x4::new(&[4.0, 3.0, 2.0, 1.0]);
+
+        a += b;
+
+        assert_eq!(vec![5.0; 4], a.to_vec());
+    }
+
+    #[test]
+    fn test_sub() {
+        let v1 = F32x4::new(&[1.0]);
+        let u1 = F32x4::new(&[5.0]);
+
+        assert_eq!(vec![6.0], (u1 + v1).to_vec());
+
+        let v2 = F32x4::new(&[1.0, 10.0]);
+        let u2 = F32x4::new(&[5.0, 11.0]);
+
+        assert_eq!(vec![6.0, 21.0], (u2 + v2).to_vec());
+
+        let v3 = F32x4::new(&[1.0, 10.0, 7.0]);
+        let u3 = F32x4::new(&[5.0, 11.0, 9.0]);
+
+        assert_eq!(vec![6.0, 21.0, 16.0], (u3 + v3).to_vec());
+
+        let v4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let u4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+
+        assert_eq!(vec![6.0, 21.0, 16.0, 7.0], (u4 + v4).to_vec());
+    }
+
+    #[test]
+    fn test_sub_assign() {
+        let mut a = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
+        let b = F32x4::new(&[4.0, 3.0, 2.0, 1.0]);
+
+        a += b;
+
+        assert_eq!(vec![5.0; 4], a.to_vec());
+    }
+
+    #[test]
+    fn test_mul() {
+        let v1 = F32x4::new(&[1.0]);
+        let u1 = F32x4::new(&[5.0]);
+
+        assert_eq!(vec![5.0], (u1 * v1).to_vec());
+
+        let v2 = F32x4::new(&[1.0, 10.0]);
+        let u2 = F32x4::new(&[5.0, 11.0]);
+
+        assert_eq!(vec![5.0, 110.0], (u2 * v2).to_vec());
+
+        let v3 = F32x4::new(&[1.0, 10.0, 7.0]);
+        let u3 = F32x4::new(&[5.0, 11.0, 9.0]);
+
+        assert_eq!(vec![5.0, 110.0, 63.0], (u3 * v3).to_vec());
+
+        let v4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let u4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+
+        assert_eq!(vec![5.0, 110.0, 63.0, 10.0], (u4 * v4).to_vec());
+
+        let v5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let u5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+
+        assert_eq!(vec![5.0, 110.0, 63.0, 10.0], (u5 * v5).to_vec());
+    }
+
+    #[test]
+    fn test_mul_assign() {
+        let mut a = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
+        let b = F32x4::new(&[4.0, 3.0, 2.0, 1.0]);
+
+        a *= b;
+
+        assert_eq!(vec![4.0, 6.0, 6.0, 4.0], a.to_vec());
+    }
+
+    #[test]
+    fn test_div() {
+        let u1 = F32x4::new(&[1.0]);
+        let v1 = F32x4::new(&[5.0]);
+
+        assert_eq!(vec![1.0 / 5.0], (u1 / v1).to_vec());
+
+        let u2 = F32x4::new(&[1.0, 10.0]);
+        let v2 = F32x4::new(&[5.0, 11.0]);
+
+        assert_eq!(vec![1.0 / 5.0, 10.0 / 11.0], (u2 / v2).to_vec());
+
+        let u3 = F32x4::new(&[1.0, 10.0, 7.0]);
+        let v3 = F32x4::new(&[5.0, 11.0, 9.0]);
+
+        assert_eq!(vec![1.0 / 5.0, 10.0 / 11.0, 7.0 / 9.0], (u3 / v3).to_vec());
+
+        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+
+        assert_eq!(
+            vec![1.0 / 5.0, 10.0 / 11.0, 7.0 / 9.0, 2.0 / 5.0],
+            (u4 / v4).to_vec()
+        );
+
+        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+
+        assert_eq!(
+            vec![1.0 / 5.0, 10.0 / 11.0, 7.0 / 9.0, 2.0 / 5.0],
+            (u5 / v5).to_vec()
+        );
+    }
+
+    #[test]
+    fn test_div_assign() {
+        let mut a = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
+        let b = F32x4::new(&[4.0, 3.0, 2.0, 1.0]);
+
+        a /= b;
+
+        assert_eq!(vec![1.0 / 4.0, 2.0 / 3.0, 3.0 / 2.0, 4.0], a.to_vec());
+    }
+
+    #[test]
+    fn test_rem() {
+        let u1 = F32x4::new(&[1.0]);
+        let v1 = F32x4::new(&[5.0]);
+
+        assert_eq!(vec![1.0 % 5.0], (u1 % v1).to_vec());
+
+        let u2 = F32x4::new(&[1.0, 10.0]);
+        let v2 = F32x4::new(&[5.0, 11.0]);
+
+        assert_eq!(vec![1.0 % 5.0, 10.0 % 11.0], (u2 % v2).to_vec());
+
+        let u3 = F32x4::new(&[1.0, 10.0, 7.0]);
+        let v3 = F32x4::new(&[5.0, 11.0, 9.0]);
+
+        assert_eq!(vec![1.0 % 5.0, 10.0 % 11.0, 7.0 % 9.0], (u3 % v3).to_vec());
+
+        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+
+        assert_eq!(
+            vec![1.0 % 5.0, 10.0 % 11.0, 7.0 % 9.0, 2.0 % 5.0],
+            (u4 % v4).to_vec()
+        );
+
+        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+
+        assert_eq!(
+            vec![1.0 % 5.0, 10.0 % 11.0, 7.0 % 9.0, 2.0 % 5.0],
+            (u5 % v5).to_vec()
+        );
+    }
+
+    #[test]
+    fn test_rem_assign() {
+        let mut a = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
+        let b = F32x4::new(&[4.0, 3.0, 2.0, 1.0]);
+
+        a %= b;
+
+        assert_eq!(vec![1.0 % 4.0, 2.0 % 3.0, 3.0 % 2.0, 4.0 % 1.0], a.to_vec());
     }
 }
