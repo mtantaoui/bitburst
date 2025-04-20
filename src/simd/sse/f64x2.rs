@@ -10,17 +10,17 @@ use std::ops::{
 
 use crate::simd::vec::SimdVec;
 
-pub const LANE_COUNT: usize = 4;
+pub const LANE_COUNT: usize = 2;
 
 /// A SIMD vector of 4 32-bit floating point values
 #[derive(Copy, Clone, Debug)]
-pub struct F32x4 {
+pub struct F64x4 {
     size: usize,
-    elements: __m128,
+    elements: __m128d,
 }
 
-impl SimdVec<f32> for F32x4 {
-    fn new(slice: &[f32]) -> Self {
+impl SimdVec<f64> for F64x4 {
+    fn new(slice: &[f64]) -> Self {
         match slice.len().cmp(&LANE_COUNT) {
             std::cmp::Ordering::Less => unsafe { Self::load_partial(slice.as_ptr(), slice.len()) },
             std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => unsafe {
@@ -29,31 +29,29 @@ impl SimdVec<f32> for F32x4 {
         }
     }
 
-    fn splat(value: f32) -> Self {
+    fn splat(value: f64) -> Self {
         Self {
-            elements: unsafe { _mm_set1_ps(value) },
+            elements: unsafe { _mm_set1_pd(value) },
             size: LANE_COUNT,
         }
     }
 
-    unsafe fn load(ptr: *const f32, size: usize) -> Self {
+    unsafe fn load(ptr: *const f64, size: usize) -> Self {
         let msg = format!("Size must be == {}", LANE_COUNT);
         assert!(size == LANE_COUNT, "{}", msg);
 
         Self {
-            elements: unsafe { _mm_loadu_ps(ptr) },
+            elements: unsafe { _mm_loadu_pd(ptr) },
             size,
         }
     }
 
-    unsafe fn load_partial(ptr: *const f32, size: usize) -> Self {
+    unsafe fn load_partial(ptr: *const f64, size: usize) -> Self {
         let msg = format!("Size must be < {}", LANE_COUNT);
         assert!(size < LANE_COUNT, "{}", msg);
 
         let elements = match size {
-            1 => unsafe { _mm_set_ps(0.0, 0.0, 0.0, *ptr.add(0)) },
-            2 => unsafe { _mm_set_ps(0.0, 0.0, *ptr.add(1), *ptr.add(0)) },
-            3 => unsafe { _mm_set_ps(0.0, *ptr.add(2), *ptr.add(1), *ptr.add(0)) },
+            1 => unsafe { _mm_set_pd(0.0, *ptr.add(0)) },
             _ => {
                 let msg = "WTF is happening here";
                 panic!("{}", msg);
@@ -63,21 +61,21 @@ impl SimdVec<f32> for F32x4 {
         Self { elements, size }
     }
 
-    fn store(&self) -> Vec<f32> {
+    fn store(&self) -> Vec<f64> {
         let msg = format!("Size must be <= {}", LANE_COUNT);
 
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
-        let mut vec = vec![0f32; LANE_COUNT];
+        let mut vec = vec![0f64; LANE_COUNT];
 
         unsafe {
-            _mm_storeu_ps(vec.as_mut_ptr(), self.elements);
+            _mm_storeu_pd(vec.as_mut_ptr(), self.elements);
         }
 
         vec
     }
 
-    fn store_partial(&self) -> Vec<f32> {
+    fn store_partial(&self) -> Vec<f64> {
         match self.size {
             1..=3 => self.store().into_iter().take(self.size).collect(),
             _ => {
@@ -87,40 +85,25 @@ impl SimdVec<f32> for F32x4 {
         }
     }
 
-    unsafe fn store_at(&self, ptr: *mut f32) {
+    unsafe fn store_at(&self, ptr: *mut f64) {
         let msg = format!("Size must be <= {}", LANE_COUNT);
 
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
         unsafe {
-            _mm_storeu_ps(ptr, self.elements);
+            _mm_storeu_pd(ptr, self.elements);
         }
     }
 
-    unsafe fn store_at_partial(&self, ptr: *mut f32) {
+    unsafe fn store_at_partial(&self, ptr: *mut f64) {
         let msg = format!("Size must be < {}", LANE_COUNT);
 
-        assert!(self.size <= LANE_COUNT, "{}", msg);
+        assert!(self.size < LANE_COUNT, "{}", msg);
 
         match self.size {
-            3 => {
-                // Store first two floats at once using _mm_store_sd
-                // This converts the lower 64 bits to double and stores them
-                let lower_two = _mm_castps_pd(self.elements);
-                _mm_store_sd(ptr as *mut f64, lower_two);
-
-                // Extract the third float and store it
-                let third = _mm_shuffle_ps(self.elements, self.elements, 0x2);
-                _mm_store_ss(ptr.add(2), third);
-            }
-            2 => {
-                // Store first two floats at once
-                let lower_two = _mm_castps_pd(self.elements);
-                _mm_store_sd(ptr as *mut f64, lower_two);
-            }
             1 => {
                 // Store first element only
-                _mm_store_ss(ptr, self.elements);
+                _mm_store_sd(ptr, self.elements);
             }
             _ => {
                 let msg = "WTF is happening here";
@@ -129,7 +112,7 @@ impl SimdVec<f32> for F32x4 {
         }
     }
 
-    fn to_vec(self) -> Vec<f32> {
+    fn to_vec(self) -> Vec<f64> {
         let msg = format!("Size must be <= {}", LANE_COUNT);
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
@@ -150,10 +133,10 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a == b elementwise
-        let mask = unsafe { _mm_cmpeq_ps(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_ps(1.0) };
+        let mask = unsafe { _mm_cmpeq_pd(self.elements, rhs.elements) }; // Result as float mask
+        let ones = unsafe { _mm_set1_pd(1.0) };
 
-        let elements = unsafe { _mm_and_ps(mask, ones) };
+        let elements = unsafe { _mm_and_pd(mask, ones) };
 
         Self {
             elements,
@@ -171,10 +154,10 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a<b elementwise
-        let mask = unsafe { _mm_cmplt_ps(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_ps(1.0) };
+        let mask = unsafe { _mm_cmplt_pd(self.elements, rhs.elements) }; // Result as float mask
+        let ones = unsafe { _mm_set1_pd(1.0) };
 
-        let elements = unsafe { _mm_and_ps(mask, ones) };
+        let elements = unsafe { _mm_and_pd(mask, ones) };
 
         Self {
             elements,
@@ -192,10 +175,10 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a<=b elementwise
-        let mask = unsafe { _mm_cmple_ps(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_ps(1.0) };
+        let mask = unsafe { _mm_cmple_pd(self.elements, rhs.elements) }; // Result as float mask
+        let ones = unsafe { _mm_set1_pd(1.0) };
 
-        let elements = unsafe { _mm_and_ps(mask, ones) };
+        let elements = unsafe { _mm_and_pd(mask, ones) };
 
         Self {
             elements,
@@ -213,10 +196,10 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a>b elementwise
-        let mask = unsafe { _mm_cmpgt_ps(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_ps(1.0) };
+        let mask = unsafe { _mm_cmpgt_pd(self.elements, rhs.elements) }; // Result as float mask
+        let ones = unsafe { _mm_set1_pd(1.0) };
 
-        let elements = unsafe { _mm_and_ps(mask, ones) };
+        let elements = unsafe { _mm_and_pd(mask, ones) };
 
         Self {
             elements,
@@ -234,10 +217,10 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a>=b elementwise
-        let mask = unsafe { _mm_cmpge_ps(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_ps(1.0) };
+        let mask = unsafe { _mm_cmpge_pd(self.elements, rhs.elements) }; // Result as float mask
+        let ones = unsafe { _mm_set1_pd(1.0) };
 
-        let elements = unsafe { _mm_and_ps(mask, ones) };
+        let elements = unsafe { _mm_and_pd(mask, ones) };
 
         Self {
             elements,
@@ -246,7 +229,7 @@ impl SimdVec<f32> for F32x4 {
     }
 }
 
-impl Add for F32x4 {
+impl Add for F64x4 {
     type Output = Self;
 
     #[inline]
@@ -260,15 +243,15 @@ impl Add for F32x4 {
         );
 
         unsafe {
-            F32x4 {
+            F64x4 {
                 size: self.size,
-                elements: _mm_add_ps(self.elements, rhs.elements),
+                elements: _mm_add_pd(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl AddAssign for F32x4 {
+impl AddAssign for F64x4 {
     #[inline]
     fn add_assign(&mut self, rhs: Self) {
         assert!(
@@ -280,12 +263,12 @@ impl AddAssign for F32x4 {
         );
 
         unsafe {
-            self.elements = _mm_add_ps(self.elements, rhs.elements);
+            self.elements = _mm_add_pd(self.elements, rhs.elements);
         }
     }
 }
 
-impl Sub for F32x4 {
+impl Sub for F64x4 {
     type Output = Self;
 
     #[inline]
@@ -299,15 +282,15 @@ impl Sub for F32x4 {
         );
 
         unsafe {
-            F32x4 {
+            F64x4 {
                 size: self.size,
-                elements: _mm_sub_ps(self.elements, rhs.elements),
+                elements: _mm_sub_pd(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl SubAssign for F32x4 {
+impl SubAssign for F64x4 {
     #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         assert!(
@@ -319,12 +302,12 @@ impl SubAssign for F32x4 {
         );
 
         unsafe {
-            self.elements = _mm_sub_ps(self.elements, rhs.elements);
+            self.elements = _mm_sub_pd(self.elements, rhs.elements);
         }
     }
 }
 
-impl Mul for F32x4 {
+impl Mul for F64x4 {
     type Output = Self;
 
     #[inline]
@@ -338,15 +321,15 @@ impl Mul for F32x4 {
         );
 
         unsafe {
-            F32x4 {
+            F64x4 {
                 size: self.size,
-                elements: _mm_mul_ps(self.elements, rhs.elements),
+                elements: _mm_mul_pd(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl MulAssign for F32x4 {
+impl MulAssign for F64x4 {
     #[inline]
     fn mul_assign(&mut self, rhs: Self) {
         assert!(
@@ -358,12 +341,12 @@ impl MulAssign for F32x4 {
         );
 
         unsafe {
-            self.elements = _mm_mul_ps(self.elements, rhs.elements);
+            self.elements = _mm_mul_pd(self.elements, rhs.elements);
         }
     }
 }
 
-impl Div for F32x4 {
+impl Div for F64x4 {
     type Output = Self;
 
     #[inline]
@@ -377,15 +360,15 @@ impl Div for F32x4 {
         );
 
         unsafe {
-            F32x4 {
+            F64x4 {
                 size: self.size,
-                elements: _mm_div_ps(self.elements, rhs.elements),
+                elements: _mm_div_pd(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl DivAssign for F32x4 {
+impl DivAssign for F64x4 {
     #[inline]
     fn div_assign(&mut self, rhs: Self) {
         assert!(
@@ -397,12 +380,12 @@ impl DivAssign for F32x4 {
         );
 
         unsafe {
-            self.elements = _mm_div_ps(self.elements, rhs.elements);
+            self.elements = _mm_div_pd(self.elements, rhs.elements);
         }
     }
 }
 
-impl Rem for F32x4 {
+impl Rem for F64x4 {
     type Output = Self;
 
     #[inline]
@@ -416,13 +399,13 @@ impl Rem for F32x4 {
         );
 
         unsafe {
-            let div = _mm_div_ps(self.elements, rhs.elements);
-            let floor = _mm_floor_ps(div);
-            let prod = _mm_mul_ps(floor, rhs.elements);
+            let div = _mm_div_pd(self.elements, rhs.elements);
+            let floor = _mm_floor_pd(div);
+            let prod = _mm_mul_pd(floor, rhs.elements);
 
-            let elements = _mm_sub_ps(self.elements, prod);
+            let elements = _mm_sub_pd(self.elements, prod);
 
-            F32x4 {
+            F64x4 {
                 size: self.size,
                 elements,
             }
@@ -430,7 +413,7 @@ impl Rem for F32x4 {
     }
 }
 
-impl RemAssign for F32x4 {
+impl RemAssign for F64x4 {
     #[inline]
     fn rem_assign(&mut self, rhs: Self) {
         assert!(
@@ -442,18 +425,18 @@ impl RemAssign for F32x4 {
         );
 
         unsafe {
-            let div = _mm_div_ps(self.elements, rhs.elements);
-            let floor = _mm_floor_ps(div);
-            let prod = _mm_mul_ps(floor, rhs.elements);
+            let div = _mm_div_pd(self.elements, rhs.elements);
+            let floor = _mm_floor_pd(div);
+            let prod = _mm_mul_pd(floor, rhs.elements);
 
-            self.elements = _mm_sub_ps(self.elements, prod);
+            self.elements = _mm_sub_pd(self.elements, prod);
         }
     }
 }
 
-impl Eq for F32x4 {}
+impl Eq for F64x4 {}
 
-impl PartialEq for F32x4 {
+impl PartialEq for F64x4 {
     fn eq(&self, other: &Self) -> bool {
         if self.size != other.size {
             return false;
@@ -461,10 +444,10 @@ impl PartialEq for F32x4 {
 
         unsafe {
             // Compare lane-by-lane
-            let cmp = _mm_cmpeq_ps(self.elements, other.elements);
+            let cmp = _mm_cmpeq_pd(self.elements, other.elements);
 
             // Move the mask to integer form
-            let mask = _mm_movemask_ps(cmp);
+            let mask = _mm_movemask_pd(cmp);
 
             // All 4 lanes equal => mask == 0b1111 == 0xF
             mask == 0xF
@@ -472,7 +455,7 @@ impl PartialEq for F32x4 {
     }
 }
 
-impl PartialOrd for F32x4 {
+impl PartialOrd for F64x4 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         if self.size != other.size {
             return None;
@@ -483,9 +466,9 @@ impl PartialOrd for F32x4 {
             let gt = self.gt_elements(*other).elements;
             let eq = self.eq_elements(*other).elements;
 
-            let lt_mask = _mm_movemask_ps(lt);
-            let gt_mask = _mm_movemask_ps(gt);
-            let eq_mask = _mm_movemask_ps(eq);
+            let lt_mask = _mm_movemask_pd(lt);
+            let gt_mask = _mm_movemask_pd(gt);
+            let eq_mask = _mm_movemask_pd(eq);
 
             match (lt_mask, gt_mask, eq_mask) {
                 (0xF, 0x0, _) => Some(std::cmp::Ordering::Less), // all lanes less
@@ -502,7 +485,7 @@ impl PartialOrd for F32x4 {
             .lt_elements(*other)
             .to_vec()
             .iter()
-            // converting f32 to bool
+            // converting f64 to bool
             .all(|&f| f != 0.0)
     }
 
@@ -510,7 +493,7 @@ impl PartialOrd for F32x4 {
         self.le_elements(*other)
             .to_vec()
             .iter()
-            // converting f32 to bool
+            // converting f64 to bool
             .all(|&f| f != 0.0)
     }
 
@@ -518,7 +501,7 @@ impl PartialOrd for F32x4 {
         self.gt_elements(*other)
             .to_vec()
             .iter()
-            // converting f32 to bool
+            // converting f64 to bool
             .all(|&f| f != 0.0)
     }
 
@@ -526,12 +509,12 @@ impl PartialOrd for F32x4 {
         self.ge_elements(*other)
             .to_vec()
             .iter()
-            // converting f32 to bool
+            // converting f64 to bool
             .all(|&f| f != 0.0)
     }
 }
 
-impl BitAnd for F32x4 {
+impl BitAnd for F64x4 {
     type Output = Self;
 
     #[inline]
@@ -545,15 +528,15 @@ impl BitAnd for F32x4 {
         );
 
         unsafe {
-            F32x4 {
+            F64x4 {
                 size: self.size,
-                elements: _mm_and_ps(self.elements, rhs.elements),
+                elements: _mm_and_pd(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl BitAndAssign for F32x4 {
+impl BitAndAssign for F64x4 {
     #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
         assert!(
@@ -568,7 +551,7 @@ impl BitAndAssign for F32x4 {
     }
 }
 
-impl BitOr for F32x4 {
+impl BitOr for F64x4 {
     type Output = Self;
 
     #[inline]
@@ -582,15 +565,15 @@ impl BitOr for F32x4 {
         );
 
         unsafe {
-            F32x4 {
+            F64x4 {
                 size: self.size,
-                elements: _mm_or_ps(self.elements, rhs.elements),
+                elements: _mm_or_pd(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl BitOrAssign for F32x4 {
+impl BitOrAssign for F64x4 {
     #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
         assert!(
@@ -602,60 +585,47 @@ impl BitOrAssign for F32x4 {
         );
 
         unsafe {
-            self.elements = _mm_or_ps(self.elements, rhs.elements);
+            self.elements = _mm_or_pd(self.elements, rhs.elements);
         }
     }
 }
 
 #[cfg(test)]
-mod f32x4_tests {
+mod f64x2_tests {
     use std::vec;
 
     use super::*;
 
     #[test]
-    /// __m128 fields are private and cannot be compared directly
+    /// __m128d fields are private and cannot be compared directly
     /// test consist on loading elements to __m128 then fetching them using .to_vec method
     /// implicitly tests load, load_partial, store, store_partial and to_vec methods
     fn test_new() {
         let a1 = vec![1.0];
-        let v1 = F32x4::new(&a1);
+        let v1 = F64x4::new(&a1);
 
         assert_eq!(a1, v1.to_vec());
         assert_eq!(a1.len(), v1.size);
 
         let a2 = vec![1.0, 2.0];
-        let v2 = F32x4::new(&a2);
+        let v2 = F64x4::new(&a2);
 
         assert_eq!(a2, v2.to_vec());
         assert_eq!(a2.len(), v2.size);
 
         let a3 = vec![1.0, 2.0, 3.0];
-        let v3 = F32x4::new(&a3);
+        let v3 = F64x4::new(&a3);
 
-        assert_eq!(a3, v3.to_vec());
-        assert_eq!(a3.len(), v3.size);
-
-        let a4 = vec![1.0, 2.0, 3.0, 4.0];
-        let v4 = F32x4::new(&a4);
-
-        assert_eq!(a4, v4.to_vec());
-        assert_eq!(a4.len(), v4.size);
-
-        // Should take only first 4 f32 elements
-        let a5 = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let v5 = F32x4::new(&a5);
-
-        assert_eq!(vec![1.0, 2.0, 3.0, 4.0], v5.to_vec());
-        assert_eq!(4, v5.size);
+        assert_eq!(vec![1.0, 2.0], v3.to_vec());
+        assert_eq!(2, v3.size);
     }
 
-    /// Splat method should duplicate one value for all elements of __m128
+    /// Splat method should duplicate one value for all elements of __m128d
     #[test]
     fn test_splat() {
-        let a = vec![1.0, 1.0, 1.0, 1.0];
+        let a = vec![1.0, 1.0];
 
-        let v = F32x4::splat(1.0);
+        let v = F64x4::splat(1.0);
 
         assert_eq!(a, v.to_vec())
     }
@@ -664,12 +634,12 @@ mod f32x4_tests {
     fn test_store_at() {
         let mut a = vec![11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 22.0];
 
-        let v = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
+        let v = F64x4::new(&[1.0, 2.0, 3.0, 4.0]);
 
         unsafe { v.store_at(a[5..].as_mut_ptr()) };
 
         assert_eq!(
-            vec![11.0, 12.0, 13.0, 14.0, 15.0, 1.0, 2.0, 3.0, 4.0, 22.0],
+            vec![11.0, 12.0, 13.0, 14.0, 15.0, 1.0, 2.0, 18.0, 19.0, 22.0],
             a
         );
     }
@@ -677,237 +647,205 @@ mod f32x4_tests {
     #[test]
     fn test_store_at_partial() {
         let mut a3 = vec![11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 22.0];
-        let v3 = F32x4::new(&[1.0, 2.0, 3.0]);
+        let v3 = F64x4::new(&[1.0]);
 
         unsafe { v3.store_at_partial(a3[5..].as_mut_ptr()) };
 
         assert_eq!(
-            vec![11.0, 12.0, 13.0, 14.0, 15.0, 1.0, 2.0, 3.0, 19.0, 22.0],
-            a3
-        );
-
-        let mut a2 = vec![11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 22.0];
-        let v2 = F32x4::new(&[1.0, 2.0]);
-
-        unsafe { v2.store_at_partial(a2[5..].as_mut_ptr()) };
-
-        assert_eq!(
-            vec![11.0, 12.0, 13.0, 14.0, 15.0, 1.0, 2.0, 18.0, 19.0, 22.0],
-            a2
-        );
-
-        let mut a1 = vec![11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 22.0];
-        let v1 = F32x4::new(&[1.0]);
-
-        unsafe { v1.store_at_partial(a1[5..].as_mut_ptr()) };
-
-        assert_eq!(
             vec![11.0, 12.0, 13.0, 14.0, 15.0, 1.0, 17.0, 18.0, 19.0, 22.0],
-            a1
+            a3
         );
     }
 
     #[test]
     fn test_add() {
-        let v1 = F32x4::new(&[1.0]);
-        let u1 = F32x4::new(&[5.0]);
+        let v1 = F64x4::new(&[1.0]);
+        let u1 = F64x4::new(&[5.0]);
 
         assert_eq!(vec![6.0], (u1 + v1).to_vec());
 
-        let v2 = F32x4::new(&[1.0, 10.0]);
-        let u2 = F32x4::new(&[5.0, 11.0]);
+        let v2 = F64x4::new(&[1.0, 10.0]);
+        let u2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(vec![6.0, 21.0], (u2 + v2).to_vec());
 
-        let v3 = F32x4::new(&[1.0, 10.0, 7.0]);
-        let u3 = F32x4::new(&[5.0, 11.0, 9.0]);
+        let v3 = F64x4::new(&[1.0, 10.0, 7.0]);
+        let u3 = F64x4::new(&[5.0, 11.0, 9.0]);
 
-        assert_eq!(vec![6.0, 21.0, 16.0], (u3 + v3).to_vec());
+        assert_eq!(vec![6.0, 21.0], (u3 + v3).to_vec());
 
-        let v4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let u4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let v4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let u4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(vec![6.0, 21.0, 16.0, 7.0], (u4 + v4).to_vec());
+        assert_eq!(vec![6.0, 21.0], (u4 + v4).to_vec());
 
-        let v5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let u5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let v5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let u5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(vec![6.0, 21.0, 16.0, 7.0], (u5 + v5).to_vec());
+        assert_eq!(vec![6.0, 21.0], (u5 + v5).to_vec());
     }
 
     #[test]
     fn test_add_assign() {
-        let mut a = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
-        let b = F32x4::new(&[4.0, 3.0, 2.0, 1.0]);
+        let mut a = F64x4::new(&[1.0, 2.0, 3.0, 4.0]);
+        let b = F64x4::new(&[4.0, 3.0, 2.0, 1.0]);
 
         a += b;
 
-        assert_eq!(vec![5.0; 4], a.to_vec());
+        assert_eq!(vec![5.0; 2], a.to_vec());
     }
 
     #[test]
     fn test_sub() {
-        let v1 = F32x4::new(&[1.0]);
-        let u1 = F32x4::new(&[5.0]);
+        let v1 = F64x4::new(&[1.0]);
+        let u1 = F64x4::new(&[5.0]);
 
         assert_eq!(vec![6.0], (u1 + v1).to_vec());
 
-        let v2 = F32x4::new(&[1.0, 10.0]);
-        let u2 = F32x4::new(&[5.0, 11.0]);
+        let v2 = F64x4::new(&[1.0, 10.0]);
+        let u2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(vec![6.0, 21.0], (u2 + v2).to_vec());
 
-        let v3 = F32x4::new(&[1.0, 10.0, 7.0]);
-        let u3 = F32x4::new(&[5.0, 11.0, 9.0]);
+        let v3 = F64x4::new(&[1.0, 10.0, 7.0]);
+        let u3 = F64x4::new(&[5.0, 11.0, 9.0]);
 
-        assert_eq!(vec![6.0, 21.0, 16.0], (u3 + v3).to_vec());
+        assert_eq!(vec![6.0, 21.0], (u3 + v3).to_vec());
 
-        let v4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let u4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let v4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let u4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(vec![6.0, 21.0, 16.0, 7.0], (u4 + v4).to_vec());
+        assert_eq!(vec![6.0, 21.0], (u4 + v4).to_vec());
     }
 
     #[test]
     fn test_sub_assign() {
-        let mut a = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
-        let b = F32x4::new(&[4.0, 3.0, 2.0, 1.0]);
+        let mut a = F64x4::new(&[1.0, 2.0, 3.0, 4.0]);
+        let b = F64x4::new(&[4.0, 3.0, 2.0, 1.0]);
 
         a += b;
 
-        assert_eq!(vec![5.0; 4], a.to_vec());
+        assert_eq!(vec![5.0; 2], a.to_vec());
     }
 
     #[test]
     fn test_mul() {
-        let v1 = F32x4::new(&[1.0]);
-        let u1 = F32x4::new(&[5.0]);
+        let v1 = F64x4::new(&[1.0]);
+        let u1 = F64x4::new(&[5.0]);
 
         assert_eq!(vec![5.0], (u1 * v1).to_vec());
 
-        let v2 = F32x4::new(&[1.0, 10.0]);
-        let u2 = F32x4::new(&[5.0, 11.0]);
+        let v2 = F64x4::new(&[1.0, 10.0]);
+        let u2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(vec![5.0, 110.0], (u2 * v2).to_vec());
 
-        let v3 = F32x4::new(&[1.0, 10.0, 7.0]);
-        let u3 = F32x4::new(&[5.0, 11.0, 9.0]);
+        let v3 = F64x4::new(&[1.0, 10.0, 7.0]);
+        let u3 = F64x4::new(&[5.0, 11.0, 9.0]);
 
-        assert_eq!(vec![5.0, 110.0, 63.0], (u3 * v3).to_vec());
+        assert_eq!(vec![5.0, 110.0], (u3 * v3).to_vec());
 
-        let v4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let u4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let v4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let u4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(vec![5.0, 110.0, 63.0, 10.0], (u4 * v4).to_vec());
+        assert_eq!(vec![5.0, 110.0], (u4 * v4).to_vec());
 
-        let v5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let u5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let v5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let u5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(vec![5.0, 110.0, 63.0, 10.0], (u5 * v5).to_vec());
+        assert_eq!(vec![5.0, 110.0], (u5 * v5).to_vec());
     }
 
     #[test]
     fn test_mul_assign() {
-        let mut a = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
-        let b = F32x4::new(&[4.0, 3.0, 2.0, 1.0]);
+        let mut a = F64x4::new(&[1.0, 2.0, 3.0, 4.0]);
+        let b = F64x4::new(&[4.0, 3.0, 2.0, 1.0]);
 
         a *= b;
 
-        assert_eq!(vec![4.0, 6.0, 6.0, 4.0], a.to_vec());
+        assert_eq!(vec![4.0, 6.0], a.to_vec());
     }
 
     #[test]
     fn test_div() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(vec![1.0 / 5.0], (u1 / v1).to_vec());
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(vec![1.0 / 5.0, 10.0 / 11.0], (u2 / v2).to_vec());
 
-        let u3 = F32x4::new(&[1.0, 10.0, 7.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 9.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 7.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 9.0]);
 
-        assert_eq!(vec![1.0 / 5.0, 10.0 / 11.0, 7.0 / 9.0], (u3 / v3).to_vec());
+        assert_eq!(vec![1.0 / 5.0, 10.0 / 11.0], (u3 / v3).to_vec());
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(
-            vec![1.0 / 5.0, 10.0 / 11.0, 7.0 / 9.0, 2.0 / 5.0],
-            (u4 / v4).to_vec()
-        );
+        assert_eq!(vec![1.0 / 5.0, 10.0 / 11.0], (u4 / v4).to_vec());
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(
-            vec![1.0 / 5.0, 10.0 / 11.0, 7.0 / 9.0, 2.0 / 5.0],
-            (u5 / v5).to_vec()
-        );
+        assert_eq!(vec![1.0 / 5.0, 10.0 / 11.0], (u5 / v5).to_vec());
     }
 
     #[test]
     fn test_div_assign() {
-        let mut a = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
-        let b = F32x4::new(&[4.0, 3.0, 2.0, 1.0]);
+        let mut a = F64x4::new(&[1.0, 2.0, 3.0, 4.0]);
+        let b = F64x4::new(&[4.0, 3.0, 2.0, 1.0]);
 
         a /= b;
 
-        assert_eq!(vec![1.0 / 4.0, 2.0 / 3.0, 3.0 / 2.0, 4.0], a.to_vec());
+        assert_eq!(vec![1.0 / 4.0, 2.0 / 3.0], a.to_vec());
     }
 
     #[test]
     fn test_rem() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(vec![1.0 % 5.0], (u1 % v1).to_vec());
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(vec![1.0 % 5.0, 10.0 % 11.0], (u2 % v2).to_vec());
 
-        let u3 = F32x4::new(&[1.0, 10.0, 7.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 9.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 7.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 9.0]);
 
-        assert_eq!(vec![1.0 % 5.0, 10.0 % 11.0, 7.0 % 9.0], (u3 % v3).to_vec());
+        assert_eq!(vec![1.0 % 5.0, 10.0 % 11.0], (u3 % v3).to_vec());
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(
-            vec![1.0 % 5.0, 10.0 % 11.0, 7.0 % 9.0, 2.0 % 5.0],
-            (u4 % v4).to_vec()
-        );
+        assert_eq!(vec![1.0 % 5.0, 10.0 % 11.0], (u4 % v4).to_vec());
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(
-            vec![1.0 % 5.0, 10.0 % 11.0, 7.0 % 9.0, 2.0 % 5.0],
-            (u5 % v5).to_vec()
-        );
+        assert_eq!(vec![1.0 % 5.0, 10.0 % 11.0], (u5 % v5).to_vec());
     }
 
     #[test]
     fn test_rem_assign() {
-        let mut a = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
-        let b = F32x4::new(&[4.0, 3.0, 2.0, 1.0]);
+        let mut a = F64x4::new(&[1.0, 2.0, 3.0, 4.0]);
+        let b = F64x4::new(&[4.0, 3.0, 2.0, 1.0]);
 
         a %= b;
 
-        assert_eq!(vec![1.0 % 4.0, 2.0 % 3.0, 3.0 % 2.0, 4.0 % 1.0], a.to_vec());
+        assert_eq!(vec![1.0 % 4.0, 2.0 % 3.0], a.to_vec());
     }
 
     #[test]
     fn test_lt_elementwise() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(
             vec![1.0 < 5.0],
@@ -918,8 +856,8 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(
             vec![1.0 < 5.0, 10.0 < 11.0],
@@ -930,11 +868,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
         assert_eq!(
-            vec![1.0 < 5.0, 10.0 < 11.0, 9.0 < 7.0],
+            vec![1.0 < 5.0, 10.0 < 11.0],
             (u3.lt_elements(v3))
                 .to_vec()
                 .iter()
@@ -942,11 +880,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
         assert_eq!(
-            vec![1.0 < 5.0, 10.0 < 11.0, 7.0 < 9.0, 2.0 < 5.0],
+            vec![1.0 < 5.0, 10.0 < 11.0],
             (u4.lt_elements(v4))
                 .to_vec()
                 .iter()
@@ -954,11 +892,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
         assert_eq!(
-            vec![1.0 < 5.0, 10.0 < 11.0, 7.0 < 9.0, 2.0 < 5.0],
+            vec![1.0 < 5.0, 10.0 < 11.0],
             (u5.lt_elements(v5))
                 .to_vec()
                 .iter()
@@ -969,8 +907,8 @@ mod f32x4_tests {
 
     #[test]
     fn test_le_elementwise() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(
             vec![1.0 <= 5.0],
@@ -981,8 +919,8 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(
             vec![1.0 <= 5.0, 10.0 <= 11.0],
@@ -993,11 +931,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
         assert_eq!(
-            vec![1.0 <= 5.0, 10.0 <= 11.0, 9.0 <= 7.0],
+            vec![1.0 <= 5.0, 10.0 <= 11.0],
             (u3.le_elements(v3))
                 .to_vec()
                 .iter()
@@ -1005,11 +943,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
         assert_eq!(
-            vec![1.0 <= 5.0, 10.0 <= 11.0, 7.0 <= 9.0, 2.0 <= 5.0],
+            vec![1.0 <= 5.0, 10.0 <= 11.0],
             (u4.le_elements(v4))
                 .to_vec()
                 .iter()
@@ -1017,11 +955,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
         assert_eq!(
-            vec![1.0 <= 5.0, 10.0 <= 11.0, 7.0 <= 9.0, 2.0 <= 5.0],
+            vec![1.0 <= 5.0, 10.0 <= 11.0],
             (u5.le_elements(v5))
                 .to_vec()
                 .iter()
@@ -1032,8 +970,8 @@ mod f32x4_tests {
 
     #[test]
     fn test_gt_elementwise() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(
             vec![1.0 > 5.0],
@@ -1044,8 +982,8 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(
             vec![1.0 > 5.0, 10.0 > 11.0],
@@ -1056,11 +994,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
         assert_eq!(
-            vec![1.0 > 5.0, 10.0 > 11.0, 9.0 > 7.0],
+            vec![1.0 > 5.0, 10.0 > 11.0],
             (u3.gt_elements(v3))
                 .to_vec()
                 .iter()
@@ -1068,11 +1006,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
         assert_eq!(
-            vec![1.0 > 5.0, 10.0 > 11.0, 7.0 > 9.0, 2.0 > 5.0],
+            vec![1.0 > 5.0, 10.0 > 11.0],
             (u4.gt_elements(v4))
                 .to_vec()
                 .iter()
@@ -1080,11 +1018,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
         assert_eq!(
-            vec![1.0 > 5.0, 10.0 > 11.0, 7.0 > 9.0, 2.0 > 5.0],
+            vec![1.0 > 5.0, 10.0 > 11.0],
             (u5.gt_elements(v5))
                 .to_vec()
                 .iter()
@@ -1095,8 +1033,8 @@ mod f32x4_tests {
 
     #[test]
     fn test_ge_elementwise() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(
             vec![1.0 >= 5.0],
@@ -1107,8 +1045,8 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(
             vec![1.0 >= 5.0, 10.0 >= 11.0],
@@ -1119,11 +1057,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
         assert_eq!(
-            vec![1.0 >= 5.0, 10.0 >= 11.0, 9.0 >= 7.0],
+            vec![1.0 >= 5.0, 10.0 >= 11.0],
             (u3.ge_elements(v3))
                 .to_vec()
                 .iter()
@@ -1131,11 +1069,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
         assert_eq!(
-            vec![1.0 >= 5.0, 10.0 >= 11.0, 7.0 >= 9.0, 2.0 >= 5.0],
+            vec![1.0 >= 5.0, 10.0 >= 11.0],
             (u4.ge_elements(v4))
                 .to_vec()
                 .iter()
@@ -1143,11 +1081,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
         assert_eq!(
-            vec![1.0 >= 5.0, 10.0 >= 11.0, 7.0 >= 9.0, 2.0 >= 5.0],
+            vec![1.0 >= 5.0, 10.0 >= 11.0],
             (u5.ge_elements(v5))
                 .to_vec()
                 .iter()
@@ -1158,8 +1096,8 @@ mod f32x4_tests {
 
     #[test]
     fn test_eq_elementwise() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(
             vec![1.0 == 5.0],
@@ -1170,8 +1108,8 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 10.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 10.0]);
 
         assert_eq!(
             vec![1.0 == 5.0, 10.0 == 10.0],
@@ -1182,11 +1120,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
         assert_eq!(
-            vec![1.0 == 5.0, 10.0 == 11.0, 9.0 == 7.0],
+            vec![1.0 == 5.0, 10.0 == 11.0],
             (u3.eq_elements(v3))
                 .to_vec()
                 .iter()
@@ -1194,11 +1132,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
         assert_eq!(
-            vec![1.0 == 5.0, 10.0 == 11.0, 7.0 == 9.0, 2.0 == 5.0],
+            vec![1.0 == 5.0, 10.0 == 11.0],
             (u4.eq_elements(v4))
                 .to_vec()
                 .iter()
@@ -1206,11 +1144,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
         assert_eq!(
-            vec![1.0 == 5.0, 10.0 == 11.0, 7.0 == 9.0, 2.0 == 5.0],
+            vec![1.0 == 5.0, 10.0 == 11.0],
             (u5.eq_elements(v5))
                 .to_vec()
                 .iter()
@@ -1221,219 +1159,148 @@ mod f32x4_tests {
 
     #[test]
     fn test_eq() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(vec![1.0 == 5.0].iter().all(|f| *f), u1 == v1);
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(vec![1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u2 == v2);
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
-        assert_eq!(
-            vec![1.0 == 5.0, 10.0 == 11.0, 9.0 == 7.0]
-                .iter()
-                .all(|f| *f),
-            u3 == v3
-        );
+        assert_eq!(vec![1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u3 == v3);
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(
-            vec![1.0 == 5.0, 10.0 == 11.0, 7.0 == 9.0, 2.0 == 5.0]
-                .iter()
-                .all(|f| *f),
-            u4 == v4
-        );
+        assert_eq!(vec![1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u4 == v4);
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(
-            vec![1.0 == 5.0, 10.0 == 11.0, 7.0 == 9.0, 2.0 == 5.0]
-                .iter()
-                .all(|f| *f),
-            u5 == v5
-        );
+        assert_eq!(vec![1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u5 == v5);
     }
 
     #[test]
     fn test_lt() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(vec![1.0 < 5.0].iter().all(|f| *f), u1 < v1);
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(vec![1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u2 < v2);
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
-        assert_eq!(
-            vec![1.0 < 5.0, 10.0 < 11.0, 9.0 < 7.0].iter().all(|f| *f),
-            u3 < v3
-        );
+        assert_eq!(vec![1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u3 < v3);
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(
-            vec![1.0 < 5.0, 10.0 < 11.0, 7.0 < 9.0, 2.0 < 5.0]
-                .iter()
-                .all(|f| *f),
-            u4 < v4
-        );
+        assert_eq!(vec![1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u4 < v4);
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(
-            vec![1.0 < 5.0, 10.0 < 11.0, 7.0 < 9.0, 2.0 < 5.0]
-                .iter()
-                .all(|f| *f),
-            u5 < v5
-        );
+        assert_eq!(vec![1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u5 < v5);
     }
 
     #[test]
     fn test_le() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(vec![1.0 <= 5.0].iter().all(|f| *f), u1 <= v1);
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(vec![1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u2 <= v2);
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
-        assert_eq!(
-            vec![1.0 <= 5.0, 10.0 <= 11.0, 9.0 <= 7.0]
-                .iter()
-                .all(|f| *f),
-            u3 <= v3
-        );
+        assert_eq!(vec![1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u3 <= v3);
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(
-            vec![1.0 <= 5.0, 10.0 <= 11.0, 7.0 <= 9.0, 2.0 <= 5.0]
-                .iter()
-                .all(|f| *f),
-            u4 <= v4
-        );
+        assert_eq!(vec![1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u4 <= v4);
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(
-            vec![1.0 <= 5.0, 10.0 <= 11.0, 7.0 <= 9.0, 2.0 <= 5.0]
-                .iter()
-                .all(|f| *f),
-            u5 <= v5
-        );
+        assert_eq!(vec![1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u5 <= v5);
     }
 
     #[test]
     fn test_gt() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(vec![1.0 > 5.0].iter().all(|f| *f), u1 > v1);
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(vec![1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u2 > v2);
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
-        assert_eq!(
-            vec![1.0 > 5.0, 10.0 > 11.0, 9.0 > 7.0].iter().all(|f| *f),
-            u3 > v3
-        );
+        assert_eq!(vec![1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u3 > v3);
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(
-            vec![1.0 > 5.0, 10.0 > 11.0, 7.0 > 9.0, 2.0 > 5.0]
-                .iter()
-                .all(|f| *f),
-            u4 > v4
-        );
+        assert_eq!(vec![1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u4 > v4);
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(
-            vec![1.0 > 5.0, 10.0 > 11.0, 7.0 > 9.0, 2.0 > 5.0]
-                .iter()
-                .all(|f| *f),
-            u5 > v5
-        );
+        assert_eq!(vec![1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u5 > v5);
     }
 
     #[test]
     fn test_ge() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[5.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[5.0]);
 
         assert_eq!(vec![1.0 >= 5.0].iter().all(|f| *f), u1 >= v1);
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(vec![1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u2 >= v2);
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
-        assert_eq!(
-            vec![1.0 >= 5.0, 10.0 >= 11.0, 9.0 >= 7.0]
-                .iter()
-                .all(|f| *f),
-            u3 >= v3
-        );
+        assert_eq!(vec![1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u3 >= v3);
 
-        let u4 = F32x4::new(&[1.0, 10.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(
-            vec![1.0 >= 5.0, 10.0 >= 11.0, 7.0 >= 9.0, 2.0 >= 5.0]
-                .iter()
-                .all(|f| *f),
-            u4 >= v4
-        );
+        assert_eq!(vec![1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u4 >= v4);
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(
-            vec![1.0 >= 5.0, 10.0 >= 11.0, 7.0 >= 9.0, 2.0 >= 5.0]
-                .iter()
-                .all(|f| *f),
-            u5 >= v5
-        );
+        assert_eq!(vec![1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u5 >= v5);
     }
 
     #[test]
     fn test_and() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[0.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[0.0]);
 
         assert_eq!(
             vec![false],
@@ -1444,8 +1311,8 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(
             vec![true, true],
@@ -1456,11 +1323,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
         assert_eq!(
-            vec![true, true, true],
+            vec![true, true],
             (u3 & v3)
                 .to_vec()
                 .iter()
@@ -1468,11 +1335,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u4 = F32x4::new(&[1.0, 0.0, 7.0, 2.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 5.0]);
+        let u4 = F64x4::new(&[1.0, 0.0, 7.0, 2.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
         assert_eq!(
-            vec![true, false, true, true],
+            vec![true, false],
             (u4 & v4)
                 .to_vec()
                 .iter()
@@ -1480,11 +1347,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
         assert_eq!(
-            vec![true, true, true, true],
+            vec![true, true],
             (u5 & v5)
                 .to_vec()
                 .iter()
@@ -1495,8 +1362,8 @@ mod f32x4_tests {
 
     #[test]
     fn test_or() {
-        let u1 = F32x4::new(&[1.0]);
-        let v1 = F32x4::new(&[0.0]);
+        let u1 = F64x4::new(&[1.0]);
+        let v1 = F64x4::new(&[0.0]);
 
         assert_eq!(
             vec![true],
@@ -1507,8 +1374,8 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u2 = F32x4::new(&[1.0, 10.0]);
-        let v2 = F32x4::new(&[5.0, 11.0]);
+        let u2 = F64x4::new(&[1.0, 10.0]);
+        let v2 = F64x4::new(&[5.0, 11.0]);
 
         assert_eq!(
             vec![true, true],
@@ -1519,11 +1386,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u3 = F32x4::new(&[1.0, 10.0, 9.0]);
-        let v3 = F32x4::new(&[5.0, 11.0, 7.0]);
+        let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
+        let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
         assert_eq!(
-            vec![true, true, true],
+            vec![true, true],
             (u3 | v3)
                 .to_vec()
                 .iter()
@@ -1531,11 +1398,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u4 = F32x4::new(&[1.0, 0.0, 7.0, 0.0]);
-        let v4 = F32x4::new(&[5.0, 11.0, 9.0, 0.0]);
+        let u4 = F64x4::new(&[1.0, 0.0, 7.0, 0.0]);
+        let v4 = F64x4::new(&[5.0, 11.0, 9.0, 0.0]);
 
         assert_eq!(
-            vec![true, true, true, false],
+            vec![true, true],
             (u4 | v4)
                 .to_vec()
                 .iter()
@@ -1543,11 +1410,11 @@ mod f32x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let u5 = F32x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
-        let v5 = F32x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
+        let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
+        let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
         assert_eq!(
-            vec![true, true, true, true],
+            vec![true, true],
             (u5 | v5)
                 .to_vec()
                 .iter()

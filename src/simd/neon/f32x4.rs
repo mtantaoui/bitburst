@@ -108,9 +108,9 @@ impl SimdVec<f32> for F32x4 {
     }
 
     unsafe fn store_at_partial(&self, ptr: *mut f32) {
-        let msg = format!("Size must be <= {}", LANE_COUNT);
+        let msg = format!("Size must be < {}", LANE_COUNT);
 
-        assert!(self.size <= LANE_COUNT, "{}", msg);
+        assert!(self.size < LANE_COUNT, "{}", msg);
 
         match self.size {
             3 => {
