@@ -34,13 +34,13 @@ impl CpuFeature {
                 detected: false,
                 nightly_only: false,
             },
-            // CpuFeature {
-            //     name: "avx2",
-            //     rustc_flag: "+avx2",
-            //     cfg_flag: "avx2",
-            //     detected: false,
-            //     nightly_only: false,
-            // },
+            CpuFeature {
+                name: "avx2",
+                rustc_flag: "+avx2",
+                cfg_flag: "avx2",
+                detected: false,
+                nightly_only: false,
+            },
             CpuFeature {
                 name: "neon",
                 rustc_flag: "+neon",
