@@ -1,8 +1,6 @@
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::*;
 
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, Div, DivAssign, Mul, MulAssign, Rem,
     RemAssign, Sub, SubAssign,
@@ -31,7 +29,7 @@ impl SimdVec<f64> for F64x4 {
 
     fn splat(value: f64) -> Self {
         Self {
-            elements: unsafe { _mm_set1_pd(value) },
+            elements: unsafe { vdupq_n_f64(value) },
             size: LANE_COUNT,
         }
     }
@@ -41,7 +39,7 @@ impl SimdVec<f64> for F64x4 {
         assert!(size == LANE_COUNT, "{}", msg);
 
         Self {
-            elements: unsafe { _mm_loadu_pd(ptr) },
+            elements: unsafe { vld1q_f64(ptr) },
             size,
         }
     }
@@ -51,7 +49,10 @@ impl SimdVec<f64> for F64x4 {
         assert!(size < LANE_COUNT, "{}", msg);
 
         let elements = match size {
-            1 => unsafe { _mm_set_pd(0.0, *ptr.add(0)) },
+            1 => {
+                let v = vdupq_n_f64(0.0);
+                vsetq_lane_f64(*ptr.add(0), v, 0)
+            }
             _ => {
                 let msg = "WTF is happening here";
                 panic!("{}", msg);
@@ -69,7 +70,7 @@ impl SimdVec<f64> for F64x4 {
         let mut vec = vec![0f64; LANE_COUNT];
 
         unsafe {
-            _mm_storeu_pd(vec.as_mut_ptr(), self.elements);
+            vst1q_f64(vec.as_mut_ptr(), self.elements);
         }
 
         vec
@@ -77,7 +78,7 @@ impl SimdVec<f64> for F64x4 {
 
     fn store_partial(&self) -> Vec<f64> {
         match self.size {
-            1..=3 => self.store().into_iter().take(self.size).collect(),
+            1 => self.store().into_iter().take(self.size).collect(),
             _ => {
                 let msg = "WTF is happening here";
                 panic!("{}", msg);
@@ -91,7 +92,7 @@ impl SimdVec<f64> for F64x4 {
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
         unsafe {
-            _mm_storeu_pd(ptr, self.elements);
+            vst1q_f64(ptr, self.elements);
         }
     }
 
@@ -102,8 +103,8 @@ impl SimdVec<f64> for F64x4 {
 
         match self.size {
             1 => {
-                // Store first element only
-                _mm_store_sd(ptr, self.elements);
+                let first = vgetq_lane_f64(self.elements, 0);
+                *ptr = first;
             }
             _ => {
                 let msg = "WTF is happening here";
@@ -133,10 +134,11 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a == b elementwise
-        let mask = unsafe { _mm_cmpeq_pd(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_pd(1.0) };
+        let mask = unsafe { vceqq_f64(self.elements, rhs.elements) }; // Result as float mask
+        let ones = unsafe { vdupq_n_f64(1.0) };
 
-        let elements = unsafe { _mm_and_pd(mask, ones) };
+        let elements =
+            unsafe { vreinterpretq_f64_u64(vandq_u64(vreinterpretq_u64_f64(ones), mask)) };
 
         Self {
             elements,
@@ -154,10 +156,11 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a<b elementwise
-        let mask = unsafe { _mm_cmplt_pd(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_pd(1.0) };
+        let mask = unsafe { vcltq_f64(self.elements, rhs.elements) }; // Result as float mask
+        let ones = unsafe { vdupq_n_f64(1.0) };
 
-        let elements = unsafe { _mm_and_pd(mask, ones) };
+        let elements =
+            unsafe { vreinterpretq_f64_u64(vandq_u64(vreinterpretq_u64_f64(ones), mask)) };
 
         Self {
             elements,
@@ -175,10 +178,11 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a<=b elementwise
-        let mask = unsafe { _mm_cmple_pd(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_pd(1.0) };
+        let mask = unsafe { vcleq_f64(self.elements, rhs.elements) }; // Result as float mask
+        let ones = unsafe { vdupq_n_f64(1.0) };
 
-        let elements = unsafe { _mm_and_pd(mask, ones) };
+        let elements =
+            unsafe { vreinterpretq_f64_u64(vandq_u64(vreinterpretq_u64_f64(ones), mask)) };
 
         Self {
             elements,
@@ -196,10 +200,11 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a>b elementwise
-        let mask = unsafe { _mm_cmpgt_pd(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_pd(1.0) };
+        let mask = unsafe { vcgtq_f64(self.elements, rhs.elements) }; // Result as float mask
+        let ones = unsafe { vdupq_n_f64(1.0) };
 
-        let elements = unsafe { _mm_and_pd(mask, ones) };
+        let elements =
+            unsafe { vreinterpretq_f64_u64(vandq_u64(vreinterpretq_u64_f64(ones), mask)) };
 
         Self {
             elements,
@@ -217,10 +222,11 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a>=b elementwise
-        let mask = unsafe { _mm_cmpge_pd(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_pd(1.0) };
+        let mask = unsafe { vcgeq_f64(self.elements, rhs.elements) }; // Result as float mask
+        let ones = unsafe { vdupq_n_f64(1.0) };
 
-        let elements = unsafe { _mm_and_pd(mask, ones) };
+        let elements =
+            unsafe { vreinterpretq_f64_u64(vandq_u64(vreinterpretq_u64_f64(ones), mask)) };
 
         Self {
             elements,
@@ -245,7 +251,7 @@ impl Add for F64x4 {
         unsafe {
             F64x4 {
                 size: self.size,
-                elements: _mm_add_pd(self.elements, rhs.elements),
+                elements: vaddq_f64(self.elements, rhs.elements),
             }
         }
     }
@@ -263,7 +269,7 @@ impl AddAssign for F64x4 {
         );
 
         unsafe {
-            self.elements = _mm_add_pd(self.elements, rhs.elements);
+            self.elements = vaddq_f64(self.elements, rhs.elements);
         }
     }
 }
@@ -284,7 +290,7 @@ impl Sub for F64x4 {
         unsafe {
             F64x4 {
                 size: self.size,
-                elements: _mm_sub_pd(self.elements, rhs.elements),
+                elements: vsubq_f64(self.elements, rhs.elements),
             }
         }
     }
@@ -302,7 +308,7 @@ impl SubAssign for F64x4 {
         );
 
         unsafe {
-            self.elements = _mm_sub_pd(self.elements, rhs.elements);
+            self.elements = vsubq_f64(self.elements, rhs.elements);
         }
     }
 }
@@ -323,7 +329,7 @@ impl Mul for F64x4 {
         unsafe {
             F64x4 {
                 size: self.size,
-                elements: _mm_mul_pd(self.elements, rhs.elements),
+                elements: vmulq_f64(self.elements, rhs.elements),
             }
         }
     }
@@ -341,7 +347,7 @@ impl MulAssign for F64x4 {
         );
 
         unsafe {
-            self.elements = _mm_mul_pd(self.elements, rhs.elements);
+            self.elements = vmulq_f64(self.elements, rhs.elements);
         }
     }
 }
@@ -362,7 +368,7 @@ impl Div for F64x4 {
         unsafe {
             F64x4 {
                 size: self.size,
-                elements: _mm_div_pd(self.elements, rhs.elements),
+                elements: vdivq_f64(self.elements, rhs.elements),
             }
         }
     }
@@ -380,7 +386,7 @@ impl DivAssign for F64x4 {
         );
 
         unsafe {
-            self.elements = _mm_div_pd(self.elements, rhs.elements);
+            self.elements = vdivq_f64(self.elements, rhs.elements);
         }
     }
 }
@@ -399,11 +405,11 @@ impl Rem for F64x4 {
         );
 
         unsafe {
-            let div = _mm_div_pd(self.elements, rhs.elements);
-            let floor = _mm_floor_pd(div);
-            let prod = _mm_mul_pd(floor, rhs.elements);
+            let div = vdivq_f64(self.elements, rhs.elements);
+            let floor = vrndq_f64(div);
+            let prod = vmulq_f64(floor, rhs.elements);
 
-            let elements = _mm_sub_pd(self.elements, prod);
+            let elements = vsubq_f64(self.elements, prod);
 
             F64x4 {
                 size: self.size,
@@ -425,11 +431,11 @@ impl RemAssign for F64x4 {
         );
 
         unsafe {
-            let div = _mm_div_pd(self.elements, rhs.elements);
-            let floor = _mm_floor_pd(div);
-            let prod = _mm_mul_pd(floor, rhs.elements);
+            let div = vdivq_f64(self.elements, rhs.elements);
+            let floor = vrndq_f64(div);
+            let prod = vmulq_f64(floor, rhs.elements);
 
-            self.elements = _mm_sub_pd(self.elements, prod);
+            self.elements = vsubq_f64(self.elements, prod);
         }
     }
 }
@@ -444,10 +450,10 @@ impl PartialEq for F64x4 {
 
         unsafe {
             // Compare lane-by-lane
-            let cmp = _mm_cmpeq_pd(self.elements, other.elements);
+            let cmp = vceqq_f64(self.elements, other.elements);
 
-            // Move the mask to integer form
-            let mask = _mm_movemask_pd(cmp);
+            // Reinterpret result as float for mask extraction
+            let mask = vget_lane_u32(vmovn_u64(cmp), 0);
 
             // All 4 lanes equal => mask == 0b1111 == 0xF
             mask == 0xF
@@ -466,9 +472,15 @@ impl PartialOrd for F64x4 {
             let gt = self.gt_elements(*other).elements;
             let eq = self.eq_elements(*other).elements;
 
-            let lt_mask = _mm_movemask_pd(lt);
-            let gt_mask = _mm_movemask_pd(gt);
-            let eq_mask = _mm_movemask_pd(eq);
+            // Convert float64x2_t to uint64x2_t where we can use bitwise operations
+            let lt_mask = vandq_u64(vreinterpretq_u64_f64(lt), vdupq_n_u64(0x1));
+            let gt_mask = vandq_u64(vreinterpretq_u64_f64(gt), vdupq_n_u64(0x1));
+            let eq_mask = vandq_u64(vreinterpretq_u64_f64(eq), vdupq_n_u64(0x1));
+
+            // Compare element-wise using NEON intrinsics
+            let lt_mask = vget_lane_u32(vmovn_u64(lt_mask), 0);
+            let gt_mask = vget_lane_u32(vmovn_u64(gt_mask), 0);
+            let eq_mask = vget_lane_u32(vmovn_u64(eq_mask), 0);
 
             match (lt_mask, gt_mask, eq_mask) {
                 (0xF, 0x0, _) => Some(std::cmp::Ordering::Less), // all lanes less
@@ -527,11 +539,19 @@ impl BitAnd for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            F64x4 {
-                size: self.size,
-                elements: _mm_and_pd(self.elements, rhs.elements),
-            }
+        // Convert float64x2_t to uint64x2_t
+        let self_u32 = unsafe { vreinterpretq_u64_f64(self.elements) }; // Reinterpret as uint32x4_t
+        let rhs_u32 = unsafe { vreinterpretq_u64_f64(rhs.elements) }; // Reinterpret as uint32x4_t
+
+        // Perform bitwise AND between the two uint64x2_t vectors
+        let result = unsafe { vandq_u64(self_u32, rhs_u32) };
+
+        // Optionally, you can convert the result back to float64x2_t if needed
+        let elements = unsafe { vreinterpretq_f64_u64(result) };
+
+        F64x4 {
+            size: self.size,
+            elements,
         }
     }
 }
@@ -564,11 +584,19 @@ impl BitOr for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            F64x4 {
-                size: self.size,
-                elements: _mm_or_pd(self.elements, rhs.elements),
-            }
+        // Convert float64x2_t to uint64x2_t
+        let self_u32 = unsafe { vreinterpretq_u64_f64(self.elements) }; // Reinterpret as uint32x4_t
+        let rhs_u32 = unsafe { vreinterpretq_u64_f64(rhs.elements) }; // Reinterpret as uint32x4_t
+
+        // Perform bitwise AND between the two uint64x2_t vectors
+        let result = unsafe { vorrq_u64(self_u32, rhs_u32) };
+
+        // Optionally, you can convert the result back to float64x2_t if needed
+        let elements = unsafe { vreinterpretq_f64_u64(result) };
+
+        F64x4 {
+            size: self.size,
+            elements,
         }
     }
 }
@@ -584,9 +612,7 @@ impl BitOrAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = _mm_or_pd(self.elements, rhs.elements);
-        }
+        *self = *self | rhs;
     }
 }
 

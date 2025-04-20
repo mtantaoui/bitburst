@@ -205,6 +205,7 @@ impl SimdVec<f32> for F32x4 {
 
         let elements =
             unsafe { vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(ones), mask)) };
+
         Self {
             elements,
             size: self.size,

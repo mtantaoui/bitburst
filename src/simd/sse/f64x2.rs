@@ -77,7 +77,7 @@ impl SimdVec<f64> for F64x4 {
 
     fn store_partial(&self) -> Vec<f64> {
         match self.size {
-            1..=3 => self.store().into_iter().take(self.size).collect(),
+            1 => self.store().into_iter().take(self.size).collect(),
             _ => {
                 let msg = "WTF is happening here";
                 panic!("{}", msg);
