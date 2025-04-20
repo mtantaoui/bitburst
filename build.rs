@@ -205,6 +205,8 @@ impl PlatformDetector {
             })
             .unwrap_or_else(|| "fallback");
 
+        println!("applying: {}", cfg_flag);
+
         println!("cargo:rustc-cfg={}", cfg_flag);
 
         // Avoid `#[cfg(...)]` on different architectures implementations
@@ -236,8 +238,16 @@ fn main() {
         CpuFeature::features()
     };
 
+    // Determine if we're cross-compiling
+    let host = env::var("HOST").unwrap_or_default();
+    let target = env::var("TARGET").unwrap_or_default();
+
+    let is_native_build = host == target;
+
     // Only run CPU detection for native builds
-    PlatformDetector::detect_cpu_features(&mut features);
+    if is_native_build {
+        PlatformDetector::detect_cpu_features(&mut features);
+    }
 
     // Pass RUSTFLAGS for enabling target features
     PlatformDetector::apply(&mut features);
