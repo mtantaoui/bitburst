@@ -262,9 +262,7 @@ impl AddAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = _mm_add_pd(self.elements, rhs.elements);
-        }
+        *self = *self + rhs;
     }
 }
 
@@ -301,9 +299,7 @@ impl SubAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = _mm_sub_pd(self.elements, rhs.elements);
-        }
+        *self = *self - rhs;
     }
 }
 
@@ -340,9 +336,7 @@ impl MulAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = _mm_mul_pd(self.elements, rhs.elements);
-        }
+        *self = *self * rhs;
     }
 }
 
@@ -379,9 +373,7 @@ impl DivAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = _mm_div_pd(self.elements, rhs.elements);
-        }
+        *self = *self / rhs;
     }
 }
 
@@ -424,13 +416,7 @@ impl RemAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            let div = _mm_div_pd(self.elements, rhs.elements);
-            let floor = _mm_floor_pd(div);
-            let prod = _mm_mul_pd(floor, rhs.elements);
-
-            self.elements = _mm_sub_pd(self.elements, prod);
-        }
+        *self = *self % rhs;
     }
 }
 
@@ -584,9 +570,7 @@ impl BitOrAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = _mm_or_pd(self.elements, rhs.elements);
-        }
+        *self = *self | rhs;
     }
 }
 

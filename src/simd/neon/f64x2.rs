@@ -268,9 +268,7 @@ impl AddAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = vaddq_f64(self.elements, rhs.elements);
-        }
+        *self = *self + rhs;
     }
 }
 
@@ -307,9 +305,7 @@ impl SubAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = vsubq_f64(self.elements, rhs.elements);
-        }
+        *self = *self - rhs;
     }
 }
 
@@ -346,9 +342,7 @@ impl MulAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = vmulq_f64(self.elements, rhs.elements);
-        }
+        *self = *self * *rhs;
     }
 }
 
@@ -385,9 +379,7 @@ impl DivAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = vdivq_f64(self.elements, rhs.elements);
-        }
+        *self = *self / rhs;
     }
 }
 
@@ -430,13 +422,7 @@ impl RemAssign for F64x4 {
             rhs.size
         );
 
-        unsafe {
-            let div = vdivq_f64(self.elements, rhs.elements);
-            let floor = vrndq_f64(div);
-            let prod = vmulq_f64(floor, rhs.elements);
-
-            self.elements = vsubq_f64(self.elements, prod);
-        }
+        *self = *self % rhs;
     }
 }
 

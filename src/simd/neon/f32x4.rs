@@ -290,9 +290,7 @@ impl AddAssign for F32x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = vaddq_f32(self.elements, rhs.elements);
-        }
+        *self = *self + rhs;
     }
 }
 
@@ -329,9 +327,7 @@ impl SubAssign for F32x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = vsubq_f32(self.elements, rhs.elements);
-        }
+        *self = *self - rhs;
     }
 }
 
@@ -368,9 +364,7 @@ impl MulAssign for F32x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = vmulq_f32(self.elements, rhs.elements);
-        }
+        *self = *self * rhs;
     }
 }
 
@@ -407,9 +401,7 @@ impl DivAssign for F32x4 {
             rhs.size
         );
 
-        unsafe {
-            self.elements = vdivq_f32(self.elements, rhs.elements);
-        }
+        *self = *self / rhs;
     }
 }
 
@@ -452,13 +444,7 @@ impl RemAssign for F32x4 {
             rhs.size
         );
 
-        unsafe {
-            let div = vdivq_f32(self.elements, rhs.elements);
-            let floor = vrndq_f32(div);
-            let prod = vmulq_f32(floor, rhs.elements);
-
-            self.elements = vsubq_f32(self.elements, prod);
-        }
+        *self = *self % rhs;
     }
 }
 
