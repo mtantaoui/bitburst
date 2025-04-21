@@ -430,9 +430,13 @@ impl Eq for F64x4 {}
 
 impl PartialEq for F64x4 {
     fn eq(&self, other: &Self) -> bool {
-        if self.size != other.size {
-            return false;
-        }
+        assert!(
+            self.size == other.size,
+            "Operands must have the same size (expected {} lanes, got {} and {})",
+            LANE_COUNT,
+            self.size,
+            other.size
+        );
 
         unsafe {
             // Compare lane-by-lane
@@ -449,9 +453,13 @@ impl PartialEq for F64x4 {
 
 impl PartialOrd for F64x4 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if self.size != other.size {
-            return None;
-        }
+        assert!(
+            self.size == other.size,
+            "Operands must have the same size (expected {} lanes, got {} and {})",
+            LANE_COUNT,
+            self.size,
+            other.size
+        );
 
         unsafe {
             let lt = self.lt_elements(*other).elements;
