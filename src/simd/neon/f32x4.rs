@@ -156,7 +156,9 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a == b elementwise
-        let elements = unsafe { vceqq_f32(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { vceqq_f32(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { vreinterpretq_f32_u32(mask) };
 
         Self {
             elements,
@@ -174,7 +176,9 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a<b elementwise
-        let elements = unsafe { vcltq_f32(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { vcltq_f32(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { vreinterpretq_f32_u32(mask) };
 
         Self {
             elements,
@@ -192,7 +196,9 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a<=b elementwise
-        let elements = unsafe { vcleq_f32(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { vcleq_f32(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { vreinterpretq_f32_u32(mask) };
 
         Self {
             elements,
@@ -210,7 +216,9 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a>b elementwise
-        let elements = unsafe { vcgtq_f32(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { vcgtq_f32(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { vreinterpretq_f32_u32(mask) };
 
         Self {
             elements,
@@ -228,7 +236,9 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a>=b elementwise
-        let elements = unsafe { vcgeq_f32(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { vcgeq_f32(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { vreinterpretq_f32_u32(mask) };
 
         Self {
             elements,

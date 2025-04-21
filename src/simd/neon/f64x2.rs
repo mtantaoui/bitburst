@@ -134,7 +134,9 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a == b elementwise
-        let elements = unsafe { vceqq_f64(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { vceqq_f64(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { vreinterpretq_f64_u64(mask) };
 
         Self {
             elements,
@@ -152,7 +154,9 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a<b elementwise
-        let elements = unsafe { vcltq_f64(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { vcltq_f64(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { vreinterpretq_f64_u64(mask) };
 
         Self {
             elements,
@@ -170,7 +174,9 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a<=b elementwise
-        let elements = unsafe { vcleq_f64(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { vcleq_f64(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { vreinterpretq_f64_u64(mask) };
 
         Self {
             elements,
@@ -188,7 +194,9 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a>b elementwise
-        let elements = unsafe { vcgtq_f64(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { vcgtq_f64(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { vreinterpretq_f64_u64(mask) };
 
         Self {
             elements,
@@ -206,7 +214,9 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a>=b elementwise
-        let elements = unsafe { vcgeq_f64(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { vcgeq_f64(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { vreinterpretq_f64_u64(mask) };
 
         Self {
             elements,
@@ -322,7 +332,7 @@ impl MulAssign for F64x4 {
             rhs.size
         );
 
-        *self = *self * *rhs;
+        *self = *self * rhs;
     }
 }
 
