@@ -133,10 +133,7 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a == b elementwise
-        let mask = unsafe { _mm_cmpeq_pd(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_pd(1.0) };
-
-        let elements = unsafe { _mm_and_pd(mask, ones) };
+        let elements = unsafe { _mm_cmpeq_pd(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -154,10 +151,7 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a<b elementwise
-        let mask = unsafe { _mm_cmplt_pd(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_pd(1.0) };
-
-        let elements = unsafe { _mm_and_pd(mask, ones) };
+        let elements = unsafe { _mm_cmplt_pd(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -175,10 +169,7 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a<=b elementwise
-        let mask = unsafe { _mm_cmple_pd(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_pd(1.0) };
-
-        let elements = unsafe { _mm_and_pd(mask, ones) };
+        let elements = unsafe { _mm_cmple_pd(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -196,10 +187,7 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a>b elementwise
-        let mask = unsafe { _mm_cmpgt_pd(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_pd(1.0) };
-
-        let elements = unsafe { _mm_and_pd(mask, ones) };
+        let elements = unsafe { _mm_cmpgt_pd(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -217,10 +205,7 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a>=b elementwise
-        let mask = unsafe { _mm_cmpge_pd(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_pd(1.0) };
-
-        let elements = unsafe { _mm_and_pd(mask, ones) };
+        let elements = unsafe { _mm_cmpge_pd(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,

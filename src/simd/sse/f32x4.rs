@@ -150,10 +150,7 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a == b elementwise
-        let mask = unsafe { _mm_cmpeq_ps(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_ps(1.0) };
-
-        let elements = unsafe { _mm_and_ps(mask, ones) };
+        let elements = unsafe { _mm_cmpeq_ps(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -171,10 +168,7 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a<b elementwise
-        let mask = unsafe { _mm_cmplt_ps(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_ps(1.0) };
-
-        let elements = unsafe { _mm_and_ps(mask, ones) };
+        let elements = unsafe { _mm_cmplt_ps(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -192,10 +186,7 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a<=b elementwise
-        let mask = unsafe { _mm_cmple_ps(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_ps(1.0) };
-
-        let elements = unsafe { _mm_and_ps(mask, ones) };
+        let elements = unsafe { _mm_cmple_ps(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -213,10 +204,7 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a>b elementwise
-        let mask = unsafe { _mm_cmpgt_ps(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_ps(1.0) };
-
-        let elements = unsafe { _mm_and_ps(mask, ones) };
+        let elements = unsafe { _mm_cmpgt_ps(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -234,10 +222,7 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a>=b elementwise
-        let mask = unsafe { _mm_cmpge_ps(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { _mm_set1_ps(1.0) };
-
-        let elements = unsafe { _mm_and_ps(mask, ones) };
+        let elements = unsafe { _mm_cmpge_ps(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -1166,12 +1151,12 @@ mod f32x4_tests {
         let v2 = F32x4::new(&[5.0, 10.0]);
 
         assert_eq!(
-            vec![1.0 == 5.0, 10.0 == 10.0],
-            (u2.eq_elements(v2))
+            vec![0x00000000, 0xFFFFFFFF],
+            u2.eq_elements(v2)
                 .to_vec()
                 .iter()
-                .map(|f| *f != 0.0)
-                .collect::<Vec<bool>>()
+                .map(|f| f.to_bits())
+                .collect::<Vec<u32>>()
         );
 
         let u3 = F32x4::new(&[1.0, 10.0, 9.0]);

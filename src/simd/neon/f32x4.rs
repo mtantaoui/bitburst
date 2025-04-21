@@ -156,11 +156,7 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a == b elementwise
-        let mask = unsafe { vceqq_f32(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { vdupq_n_f32(1.0) };
-
-        let elements =
-            unsafe { vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(ones), mask)) };
+        let elements = unsafe { vceqq_f32(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -178,11 +174,7 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a<b elementwise
-        let mask = unsafe { vcltq_f32(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { vdupq_n_f32(1.0) };
-
-        let elements =
-            unsafe { vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(ones), mask)) };
+        let elements = unsafe { vcltq_f32(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -200,11 +192,7 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a<=b elementwise
-        let mask = unsafe { vcleq_f32(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { vdupq_n_f32(1.0) };
-
-        let elements =
-            unsafe { vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(ones), mask)) };
+        let elements = unsafe { vcleq_f32(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -222,11 +210,7 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a>b elementwise
-        let mask = unsafe { vcgtq_f32(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { vdupq_n_f32(1.0) };
-
-        let elements =
-            unsafe { vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(ones), mask)) };
+        let elements = unsafe { vcgtq_f32(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -244,11 +228,7 @@ impl SimdVec<f32> for F32x4 {
         );
 
         // Compare a>=b elementwise
-        let mask = unsafe { vcgeq_f32(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { vdupq_n_f32(1.0) };
-
-        let elements =
-            unsafe { vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(ones), mask)) };
+        let elements = unsafe { vcgeq_f32(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,

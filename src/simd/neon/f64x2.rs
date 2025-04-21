@@ -134,11 +134,7 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a == b elementwise
-        let mask = unsafe { vceqq_f64(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { vdupq_n_f64(1.0) };
-
-        let elements =
-            unsafe { vreinterpretq_f64_u64(vandq_u64(vreinterpretq_u64_f64(ones), mask)) };
+        let elements = unsafe { vceqq_f64(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -156,11 +152,7 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a<b elementwise
-        let mask = unsafe { vcltq_f64(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { vdupq_n_f64(1.0) };
-
-        let elements =
-            unsafe { vreinterpretq_f64_u64(vandq_u64(vreinterpretq_u64_f64(ones), mask)) };
+        let elements = unsafe { vcltq_f64(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -178,11 +170,7 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a<=b elementwise
-        let mask = unsafe { vcleq_f64(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { vdupq_n_f64(1.0) };
-
-        let elements =
-            unsafe { vreinterpretq_f64_u64(vandq_u64(vreinterpretq_u64_f64(ones), mask)) };
+        let elements = unsafe { vcleq_f64(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -200,11 +188,7 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a>b elementwise
-        let mask = unsafe { vcgtq_f64(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { vdupq_n_f64(1.0) };
-
-        let elements =
-            unsafe { vreinterpretq_f64_u64(vandq_u64(vreinterpretq_u64_f64(ones), mask)) };
+        let elements = unsafe { vcgtq_f64(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -222,11 +206,7 @@ impl SimdVec<f64> for F64x4 {
         );
 
         // Compare a>=b elementwise
-        let mask = unsafe { vcgeq_f64(self.elements, rhs.elements) }; // Result as float mask
-        let ones = unsafe { vdupq_n_f64(1.0) };
-
-        let elements =
-            unsafe { vreinterpretq_f64_u64(vandq_u64(vreinterpretq_u64_f64(ones), mask)) };
+        let elements = unsafe { vcgeq_f64(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
