@@ -21,6 +21,8 @@ pub struct F32x4 {
 
 impl SimdVec<f32> for F32x4 {
     fn new(slice: &[f32]) -> Self {
+        assert!(slice.len() != 0, "Size can't be zero");
+
         match slice.len().cmp(&LANE_COUNT) {
             std::cmp::Ordering::Less => unsafe { Self::load_partial(slice.as_ptr(), slice.len()) },
             std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => unsafe {
