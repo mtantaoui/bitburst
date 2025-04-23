@@ -752,9 +752,9 @@ mod f32x4_tests {
         let mut a = F32x4::new(&[1.0, 2.0, 3.0, 4.0]);
         let b = F32x4::new(&[4.0, 3.0, 2.0, 1.0]);
 
-        a += b;
+        a -= b;
 
-        assert_eq!(vec![5.0; 4], a.to_vec());
+        assert_eq!(vec![-3.0, -1.0, 1.0, 3.0], a.to_vec());
     }
 
     #[test]
