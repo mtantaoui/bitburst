@@ -554,7 +554,6 @@ impl BitAnd for F32x4 {
         // Perform bitwise AND between the two uint32x4_t vectors
         let result: uint32x4_t = unsafe { vandq_u32(self_u32, rhs_u32) };
 
-        // Optionally, you can convert the result back to float32x4_t if needed
         let elements: float32x4_t = unsafe { vreinterpretq_f32_u32(result) };
 
         F32x4 {
@@ -598,7 +597,6 @@ impl BitOr for F32x4 {
         // Perform bitwise AND between the two uint32x4_t vectors
         let result: uint32x4_t = unsafe { vorrq_u32(self_u32, rhs_u32) };
 
-        // Optionally, you can convert the result back to float32x4_t if needed
         let elements: float32x4_t = unsafe { vreinterpretq_f32_u32(result) };
 
         F32x4 {

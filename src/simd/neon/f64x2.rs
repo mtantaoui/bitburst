@@ -532,7 +532,6 @@ impl BitAnd for F64x4 {
         // Perform bitwise AND between the two uint64x2_t vectors
         let result = unsafe { vandq_u64(self_u32, rhs_u32) };
 
-        // Optionally, you can convert the result back to float64x2_t if needed
         let elements = unsafe { vreinterpretq_f64_u64(result) };
 
         F64x4 {
@@ -577,7 +576,6 @@ impl BitOr for F64x4 {
         // Perform bitwise AND between the two uint64x2_t vectors
         let result = unsafe { vorrq_u64(self_u32, rhs_u32) };
 
-        // Optionally, you can convert the result back to float64x2_t if needed
         let elements = unsafe { vreinterpretq_f64_u64(result) };
 
         F64x4 {
