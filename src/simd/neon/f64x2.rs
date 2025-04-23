@@ -1174,27 +1174,27 @@ mod f64x2_tests {
         let u1 = F64x4::new(&[1.0]);
         let v1 = F64x4::new(&[5.0]);
 
-        assert_eq!(vec![1.0 == 5.0].iter().all(|f| *f), u1 == v1);
+        assert_eq!([1.0 == 5.0].iter().all(|f| *f), u1 == v1);
 
         let u2 = F64x4::new(&[1.0, 10.0]);
         let v2 = F64x4::new(&[5.0, 11.0]);
 
-        assert_eq!(vec![1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u2 == v2);
+        assert_eq!([1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u2 == v2);
 
         let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
         let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
-        assert_eq!(vec![1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u3 == v3);
+        assert_eq!([1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u3 == v3);
 
         let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
         let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(vec![1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u4 == v4);
+        assert_eq!([1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u4 == v4);
 
         let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
         let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(vec![1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u5 == v5);
+        assert_eq!([1.0 == 5.0, 10.0 == 11.0].iter().all(|f| *f), u5 == v5);
     }
 
     #[test]
@@ -1202,27 +1202,27 @@ mod f64x2_tests {
         let u1 = F64x4::new(&[1.0]);
         let v1 = F64x4::new(&[5.0]);
 
-        assert_eq!(vec![1.0 < 5.0].iter().all(|f| *f), u1 < v1);
+        assert_eq!([1.0 < 5.0].iter().all(|f| *f), u1 < v1);
 
         let u2 = F64x4::new(&[1.0, 10.0]);
         let v2 = F64x4::new(&[5.0, 11.0]);
 
-        assert_eq!(vec![1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u2 < v2);
+        assert_eq!([1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u2 < v2);
 
         let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
         let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
-        assert_eq!(vec![1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u3 < v3);
+        assert_eq!([1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u3 < v3);
 
         let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
         let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(vec![1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u4 < v4);
+        assert_eq!([1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u4 < v4);
 
         let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
         let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(vec![1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u5 < v5);
+        assert_eq!([1.0 < 5.0, 10.0 < 11.0].iter().all(|f| *f), u5 < v5);
     }
 
     #[test]
@@ -1230,27 +1230,27 @@ mod f64x2_tests {
         let u1 = F64x4::new(&[1.0]);
         let v1 = F64x4::new(&[5.0]);
 
-        assert_eq!(vec![1.0 <= 5.0].iter().all(|f| *f), u1 <= v1);
+        assert_eq!([1.0 <= 5.0].iter().all(|f| *f), u1 <= v1);
 
         let u2 = F64x4::new(&[1.0, 10.0]);
         let v2 = F64x4::new(&[5.0, 11.0]);
 
-        assert_eq!(vec![1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u2 <= v2);
+        assert_eq!([1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u2 <= v2);
 
         let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
         let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
-        assert_eq!(vec![1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u3 <= v3);
+        assert_eq!([1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u3 <= v3);
 
         let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
         let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(vec![1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u4 <= v4);
+        assert_eq!([1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u4 <= v4);
 
         let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
         let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(vec![1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u5 <= v5);
+        assert_eq!([1.0 <= 5.0, 10.0 <= 11.0].iter().all(|f| *f), u5 <= v5);
     }
 
     #[test]
@@ -1258,27 +1258,27 @@ mod f64x2_tests {
         let u1 = F64x4::new(&[1.0]);
         let v1 = F64x4::new(&[5.0]);
 
-        assert_eq!(vec![1.0 > 5.0].iter().all(|f| *f), u1 > v1);
+        assert_eq!([1.0 > 5.0].iter().all(|f| *f), u1 > v1);
 
         let u2 = F64x4::new(&[1.0, 10.0]);
         let v2 = F64x4::new(&[5.0, 11.0]);
 
-        assert_eq!(vec![1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u2 > v2);
+        assert_eq!([1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u2 > v2);
 
         let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
         let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
-        assert_eq!(vec![1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u3 > v3);
+        assert_eq!([1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u3 > v3);
 
         let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
         let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(vec![1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u4 > v4);
+        assert_eq!([1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u4 > v4);
 
         let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
         let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(vec![1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u5 > v5);
+        assert_eq!([1.0 > 5.0, 10.0 > 11.0].iter().all(|f| *f), u5 > v5);
     }
 
     #[test]
@@ -1286,27 +1286,27 @@ mod f64x2_tests {
         let u1 = F64x4::new(&[1.0]);
         let v1 = F64x4::new(&[5.0]);
 
-        assert_eq!(vec![1.0 >= 5.0].iter().all(|f| *f), u1 >= v1);
+        assert_eq!([1.0 >= 5.0].iter().all(|f| *f), u1 >= v1);
 
         let u2 = F64x4::new(&[1.0, 10.0]);
         let v2 = F64x4::new(&[5.0, 11.0]);
 
-        assert_eq!(vec![1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u2 >= v2);
+        assert_eq!([1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u2 >= v2);
 
         let u3 = F64x4::new(&[1.0, 10.0, 9.0]);
         let v3 = F64x4::new(&[5.0, 11.0, 7.0]);
 
-        assert_eq!(vec![1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u3 >= v3);
+        assert_eq!([1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u3 >= v3);
 
         let u4 = F64x4::new(&[1.0, 10.0, 7.0, 2.0]);
         let v4 = F64x4::new(&[5.0, 11.0, 9.0, 5.0]);
 
-        assert_eq!(vec![1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u4 >= v4);
+        assert_eq!([1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u4 >= v4);
 
         let u5 = F64x4::new(&[1.0, 10.0, 7.0, 2.0, 1.0]);
         let v5 = F64x4::new(&[5.0, 11.0, 9.0, 5.0, 1.0]);
 
-        assert_eq!(vec![1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u5 >= v5);
+        assert_eq!([1.0 >= 5.0, 10.0 >= 11.0].iter().all(|f| *f), u5 >= v5);
     }
 
     #[test]
