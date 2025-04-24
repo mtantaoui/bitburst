@@ -943,6 +943,18 @@ mod i8x16_tests {
 
             assert_eq!(test, vector.as_slice());
         });
+
+        let mut vector = vec![100; 3];
+
+        let a: Vec<i8> = (1..=1).collect();
+
+        let v = I8x16::new(a.as_slice());
+
+        unsafe {
+            v.store_at_partial(vector[2..].as_mut_ptr());
+        }
+
+        assert_eq!(vector, [100, 100, 1])
     }
 
     #[test]
