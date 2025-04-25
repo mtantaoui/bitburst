@@ -91,7 +91,7 @@ impl SimdVec<f32> for F32x4 {
 
     fn store_partial(&self) -> Vec<f32> {
         match self.size {
-            1..=3 => self.store().into_iter().take(self.size).collect(),
+            1..LANE_COUNT => self.store().into_iter().take(self.size).collect(),
             _ => {
                 let msg = "WTF is happening here";
                 panic!("{}", msg);
