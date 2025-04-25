@@ -15,8 +15,8 @@ pub struct I32x4 {
     elements: int32x4_t,
 }
 
-impl SimdVec<i16> for I32x4 {
-    fn new(slice: &[i16]) -> Self {
+impl SimdVec<i32> for I32x4 {
+    fn new(slice: &[i32]) -> Self {
         assert!(!slice.is_empty(), "Size can't be zero");
 
         match slice.len().cmp(&LANE_COUNT) {
@@ -27,14 +27,14 @@ impl SimdVec<i16> for I32x4 {
         }
     }
 
-    fn splat(value: i16) -> Self {
+    fn splat(value: i32) -> Self {
         Self {
             elements: unsafe { vdupq_n_s32(value) },
             size: LANE_COUNT,
         }
     }
 
-    unsafe fn load(ptr: *const i16, size: usize) -> Self {
+    unsafe fn load(ptr: *const i32, size: usize) -> Self {
         let msg = format!("Size must be == {}", LANE_COUNT);
         assert!(size == LANE_COUNT, "{}", msg);
 
@@ -44,7 +44,7 @@ impl SimdVec<i16> for I32x4 {
         }
     }
 
-    unsafe fn load_partial(ptr: *const i16, size: usize) -> Self {
+    unsafe fn load_partial(ptr: *const i32, size: usize) -> Self {
         let msg = format!("Size must be < {}", LANE_COUNT);
         assert!(size < LANE_COUNT, "{}", msg);
         // Start with a zero vector
@@ -73,12 +73,12 @@ impl SimdVec<i16> for I32x4 {
         Self { elements, size }
     }
 
-    fn store(&self) -> Vec<i16> {
+    fn store(&self) -> Vec<i32> {
         let msg = format!("Size must be <= {}", LANE_COUNT);
 
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
-        let mut vec = vec![0i16; LANE_COUNT];
+        let mut vec = vec![0i32; LANE_COUNT];
 
         unsafe {
             vst1q_s32(vec.as_mut_ptr(), self.elements);
@@ -87,7 +87,7 @@ impl SimdVec<i16> for I32x4 {
         vec
     }
 
-    fn store_partial(&self) -> Vec<i16> {
+    fn store_partial(&self) -> Vec<i32> {
         match self.size {
             1..LANE_COUNT => self.store().into_iter().take(self.size).collect(),
             _ => {
@@ -97,7 +97,7 @@ impl SimdVec<i16> for I32x4 {
         }
     }
 
-    unsafe fn store_at(&self, ptr: *mut i16) {
+    unsafe fn store_at(&self, ptr: *mut i32) {
         let msg = format!("Size must be == {}", LANE_COUNT);
 
         assert!(self.size == LANE_COUNT, "{}", msg);
@@ -107,7 +107,7 @@ impl SimdVec<i16> for I32x4 {
         }
     }
 
-    unsafe fn store_at_partial(&self, ptr: *mut i16) {
+    unsafe fn store_at_partial(&self, ptr: *mut i32) {
         let msg = format!("Size must be < {}", LANE_COUNT);
 
         assert!(self.size < LANE_COUNT, "{}", msg);
@@ -130,7 +130,7 @@ impl SimdVec<i16> for I32x4 {
         }
     }
 
-    fn to_vec(self) -> Vec<i16> {
+    fn to_vec(self) -> Vec<i32> {
         let msg = format!("Size must be <= {}", LANE_COUNT);
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
@@ -153,7 +153,7 @@ impl SimdVec<i16> for I32x4 {
         // Compare a == b elementwise
         let mask = unsafe { vceqq_s32(self.elements, rhs.elements) };
 
-        let elements = unsafe { vreinterpretq_s32_u16(mask) };
+        let elements = unsafe { vreinterpretq_s32_u32(mask) };
 
         Self {
             elements,
@@ -173,7 +173,7 @@ impl SimdVec<i16> for I32x4 {
         // Compare a<b elementwise
         let mask = unsafe { vcltq_s32(self.elements, rhs.elements) };
 
-        let elements = unsafe { vreinterpretq_s32_u16(mask) };
+        let elements = unsafe { vreinterpretq_s32_u32(mask) };
 
         Self {
             elements,
@@ -193,7 +193,7 @@ impl SimdVec<i16> for I32x4 {
         // Compare a<=b elementwise
         let mask = unsafe { vcleq_s32(self.elements, rhs.elements) };
 
-        let elements = unsafe { vreinterpretq_s32_u16(mask) };
+        let elements = unsafe { vreinterpretq_s32_u32(mask) };
 
         Self {
             elements,
@@ -213,7 +213,7 @@ impl SimdVec<i16> for I32x4 {
         // Compare a>b elementwise
         let mask = unsafe { vcgtq_s32(self.elements, rhs.elements) };
 
-        let elements = unsafe { vreinterpretq_s32_u16(mask) };
+        let elements = unsafe { vreinterpretq_s32_u32(mask) };
 
         Self {
             elements,
@@ -233,7 +233,7 @@ impl SimdVec<i16> for I32x4 {
         // Compare a>=b elementwise
         let mask = unsafe { vcgeq_s32(self.elements, rhs.elements) };
 
-        let elements = unsafe { vreinterpretq_s32_u16(mask) };
+        let elements = unsafe { vreinterpretq_s32_u32(mask) };
 
         Self {
             elements,
@@ -370,7 +370,7 @@ impl PartialEq for I32x4 {
 
             // Reinterpret result as float for mask extraction
             // let mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_s32(vreinterpretq_s32_u8(cmp))), 0);
-            let mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_u16(cmp)), 0);
+            let mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_u32(cmp)), 0);
 
             // All 4 lanes equal => mask == 0b1111 == 0xF
             mask == 0xF
@@ -417,7 +417,7 @@ impl PartialOrd for I32x4 {
             .lt_elements(*other)
             .to_vec()
             .iter()
-            // converting i16 to bool
+            // converting i32 to bool
             .all(|&f| f != 0)
     }
 
@@ -425,7 +425,7 @@ impl PartialOrd for I32x4 {
         self.le_elements(*other)
             .to_vec()
             .iter()
-            // converting i16 to bool
+            // converting i32 to bool
             .all(|&f| f != 0)
     }
 
@@ -433,7 +433,7 @@ impl PartialOrd for I32x4 {
         self.gt_elements(*other)
             .to_vec()
             .iter()
-            // converting i16 to bool
+            // converting i32 to bool
             .all(|&f| f != 0)
     }
 
@@ -441,7 +441,7 @@ impl PartialOrd for I32x4 {
         self.ge_elements(*other)
             .to_vec()
             .iter()
-            // converting i16 to bool
+            // converting i32 to bool
             .all(|&f| f != 0)
     }
 }
