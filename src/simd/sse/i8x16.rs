@@ -358,7 +358,7 @@ impl SimdVec<i8> for I8x16 {
 
     fn store_partial(&self) -> Vec<i8> {
         match self.size {
-            1..=15 => self.store().into_iter().take(self.size).collect(),
+            1..LANE_COUNT => self.store().into_iter().take(self.size).collect(),
             _ => {
                 let msg = "WTF is happening here";
                 panic!("{}", msg);
