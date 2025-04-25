@@ -1,8 +1,5 @@
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::*;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, Mul, MulAssign, Sub, SubAssign,
 };
@@ -15,7 +12,7 @@ pub const LANE_COUNT: usize = 2;
 #[derive(Copy, Clone, Debug)]
 pub struct I64x2 {
     size: usize,
-    elements: __m128i,
+    elements: int64x2_t,
 }
 
 impl SimdVec<i64> for I64x2 {
@@ -32,7 +29,7 @@ impl SimdVec<i64> for I64x2 {
 
     fn splat(value: i64) -> Self {
         Self {
-            elements: unsafe { _mm_set1_epi64x(value) },
+            elements: unsafe { vdupq_n_s64(value) },
             size: LANE_COUNT,
         }
     }
@@ -42,7 +39,7 @@ impl SimdVec<i64> for I64x2 {
         assert!(size == LANE_COUNT, "{}", msg);
 
         Self {
-            elements: unsafe { _mm_loadu_si128(ptr as *const __m128i) },
+            elements: unsafe { vld1q_s64(ptr) },
             size,
         }
     }
@@ -50,16 +47,19 @@ impl SimdVec<i64> for I64x2 {
     unsafe fn load_partial(ptr: *const i64, size: usize) -> Self {
         let msg = format!("Size must be < {}", LANE_COUNT);
         assert!(size < LANE_COUNT, "{}", msg);
+        // Start with a zero vector
+        let mut elements = vdupq_n_s64(0);
 
-        let elements = match size {
-            1 => unsafe { _mm_set_epi64x(0, *ptr.add(0)) },
-
+        // Load elements individually using vsetq_lane
+        match size {
+            1 => {
+                elements = vsetq_lane_s64(*ptr.add(0), elements, 0);
+            }
             _ => {
                 let msg = "WTF is happening here";
                 panic!("{}", msg);
             }
-        };
-
+        }
         Self { elements, size }
     }
 
@@ -71,7 +71,7 @@ impl SimdVec<i64> for I64x2 {
         let mut vec = vec![0i64; LANE_COUNT];
 
         unsafe {
-            _mm_storeu_si128(vec.as_mut_ptr() as *mut __m128i, self.elements);
+            vst1q_s64(vec.as_mut_ptr(), self.elements);
         }
 
         vec
@@ -93,7 +93,7 @@ impl SimdVec<i64> for I64x2 {
         assert!(self.size == LANE_COUNT, "{}", msg);
 
         unsafe {
-            _mm_storeu_si128(ptr as *mut __m128i, self.elements);
+            vst1q_s64(ptr, self.elements);
         }
     }
 
@@ -103,9 +103,12 @@ impl SimdVec<i64> for I64x2 {
         assert!(self.size < LANE_COUNT, "{}", msg);
 
         match self.size {
-            1 => *ptr.add(0) = _mm_cvtsi128_si64(self.elements),
-            _ => panic!("Invalid size"),
-        };
+            1 => *ptr.add(0) = vgetq_lane_s64(self.elements, 0),
+            _ => {
+                let msg = "WTF is happening here";
+                panic!("{}", msg);
+            }
+        }
     }
 
     fn to_vec(self) -> Vec<i64> {
@@ -129,7 +132,10 @@ impl SimdVec<i64> for I64x2 {
         );
 
         // Compare a == b elementwise
-        let elements = unsafe { _mm_cmpeq_epi64(self.elements, rhs.elements) };
+        let mask = unsafe { vceqq_s64(self.elements, rhs.elements) };
+
+        let elements = unsafe { vreinterpretq_s64_u64(mask) };
+
         Self {
             elements,
             size: self.size,
@@ -146,7 +152,9 @@ impl SimdVec<i64> for I64x2 {
         );
 
         // Compare a<b elementwise
-        let elements = unsafe { _mm_cmpgt_epi64(rhs.elements, self.elements) };
+        let mask = unsafe { vcltq_s64(self.elements, rhs.elements) };
+
+        let elements = unsafe { vreinterpretq_s64_u64(mask) };
 
         Self {
             elements,
@@ -164,9 +172,9 @@ impl SimdVec<i64> for I64x2 {
         );
 
         // Compare a<=b elementwise
-        let less_than = unsafe { _mm_cmpgt_epi64(rhs.elements, self.elements) };
-        let equal = unsafe { _mm_cmpeq_epi64(self.elements, rhs.elements) };
-        let elements = unsafe { _mm_or_si128(less_than, equal) };
+        let mask = unsafe { vcleq_s64(self.elements, rhs.elements) };
+
+        let elements = unsafe { vreinterpretq_s64_u64(mask) };
 
         Self {
             elements,
@@ -184,7 +192,9 @@ impl SimdVec<i64> for I64x2 {
         );
 
         // Compare a>b elementwise
-        let elements = unsafe { _mm_cmpgt_epi64(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { vcgtq_s64(self.elements, rhs.elements) };
+
+        let elements = unsafe { vreinterpretq_s64_u64(mask) };
 
         Self {
             elements,
@@ -202,9 +212,9 @@ impl SimdVec<i64> for I64x2 {
         );
 
         // Compare a>=b elementwise
-        let greater_than = unsafe { _mm_cmpgt_epi64(self.elements, rhs.elements) };
-        let equal = unsafe { _mm_cmpeq_epi64(self.elements, rhs.elements) };
-        let elements = unsafe { _mm_or_si128(greater_than, equal) };
+        let mask = unsafe { vcgeq_s64(self.elements, rhs.elements) };
+
+        let elements = unsafe { vreinterpretq_s64_u64(mask) };
 
         Self {
             elements,
@@ -229,7 +239,7 @@ impl Add for I64x2 {
         unsafe {
             I64x2 {
                 size: self.size,
-                elements: _mm_add_epi64(self.elements, rhs.elements),
+                elements: vaddq_s64(self.elements, rhs.elements),
             }
         }
     }
@@ -266,7 +276,7 @@ impl Sub for I64x2 {
         unsafe {
             I64x2 {
                 size: self.size,
-                elements: _mm_sub_epi64(self.elements, rhs.elements),
+                elements: vsubq_s64(self.elements, rhs.elements),
             }
         }
     }
@@ -300,21 +310,15 @@ impl Mul for I64x2 {
             rhs.size
         );
 
-        // Extract low 64 bits
-        let self_lo = unsafe { _mm_cvtsi128_si64(self.elements) };
-        let rhs_lo = unsafe { _mm_cvtsi128_si64(rhs.elements) };
+        let self_arr: [i64; 2] = unsafe { core::mem::transmute(self.elements) };
+        let rhs_arr: [i64; 2] = unsafe { core::mem::transmute(rhs.elements) };
 
-        // Extract high 64 bits
-        let self_hi =
-            unsafe { _mm_cvtsi128_si64(_mm_unpackhi_epi64(self.elements, self.elements)) };
-        let rhs_hi = unsafe { _mm_cvtsi128_si64(_mm_unpackhi_epi64(rhs.elements, rhs.elements)) };
+        let mul = [
+            self_arr[0].wrapping_mul(rhs_arr[0]),
+            self_arr[1].wrapping_mul(rhs_arr[1]),
+        ];
 
-        // Multiply using scalar ops
-        let mul_lo = self_lo.wrapping_mul(rhs_lo);
-        let mul_hi = self_hi.wrapping_mul(rhs_hi);
-
-        // Pack back into __m128i
-        let elements = unsafe { _mm_set_epi64x(mul_hi, mul_lo) };
+        let elements: int64x2_t = unsafe { core::mem::transmute(mul) };
 
         I64x2 {
             size: self.size,
@@ -351,10 +355,11 @@ impl PartialEq for I64x2 {
 
         unsafe {
             // Compare lane-by-lane
-            let cmp = _mm_cmpeq_epi64(self.elements, other.elements);
+            let cmp = vceqq_s64(self.elements, other.elements);
 
-            // Move the mask to integer form
-            let mask = _mm_movemask_epi8(cmp);
+            // Reinterpret result as float for mask extraction
+            // let mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_s64(vreinterpretq_s64_u8(cmp))), 0);
+            let mask = vget_lane_u32(vmovn_u64(cmp), 0);
 
             // All 4 lanes equal => mask == 0b1111 == 0xF
             mask == 0xF
@@ -377,9 +382,14 @@ impl PartialOrd for I64x2 {
             let gt = self.gt_elements(*other).elements;
             let eq = self.eq_elements(*other).elements;
 
-            let lt_mask = _mm_movemask_epi8(lt);
-            let gt_mask = _mm_movemask_epi8(gt);
-            let eq_mask = _mm_movemask_epi8(eq);
+            let lt_mask = vandq_u32(vreinterpretq_u32_s64(lt), vdupq_n_u32(0x1));
+            let gt_mask = vandq_u32(vreinterpretq_u32_s64(gt), vdupq_n_u32(0x1));
+            let eq_mask = vandq_u32(vreinterpretq_u32_s64(eq), vdupq_n_u32(0x1));
+
+            // Compare element-wise using NEON intrinsics
+            let lt_mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_u32(lt_mask)), 0);
+            let gt_mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_u32(gt_mask)), 0);
+            let eq_mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_u32(eq_mask)), 0);
 
             match (lt_mask, gt_mask, eq_mask) {
                 (0xF, 0x0, _) => Some(std::cmp::Ordering::Less), // all lanes less
@@ -438,11 +448,12 @@ impl BitAnd for I64x2 {
             rhs.size
         );
 
-        unsafe {
-            I64x2 {
-                size: self.size,
-                elements: _mm_and_si128(self.elements, rhs.elements),
-            }
+        // Perform bitwise AND between the two uint32x4_t vectors
+        let elements = unsafe { vandq_s64(self.elements, rhs.elements) };
+
+        I64x2 {
+            size: self.size,
+            elements,
         }
     }
 }
@@ -475,11 +486,11 @@ impl BitOr for I64x2 {
             rhs.size
         );
 
-        unsafe {
-            I64x2 {
-                size: self.size,
-                elements: _mm_or_si128(self.elements, rhs.elements),
-            }
+        let elements = unsafe { vorrq_s64(self.elements, rhs.elements) };
+
+        I64x2 {
+            size: self.size,
+            elements,
         }
     }
 }
