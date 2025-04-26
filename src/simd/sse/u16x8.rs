@@ -1,5 +1,8 @@
-#[cfg(target_arch = "aarch64")]
-use std::arch::aarch64::*;
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, Mul, MulAssign, Sub, SubAssign,
 };
@@ -12,7 +15,7 @@ pub const LANE_COUNT: usize = 8;
 #[derive(Copy, Clone, Debug)]
 pub struct U16x8 {
     size: usize,
-    elements: uint16x8_t,
+    elements: __m128i,
 }
 
 impl SimdVec<u16> for U16x8 {
@@ -29,7 +32,7 @@ impl SimdVec<u16> for U16x8 {
 
     fn splat(value: u16) -> Self {
         Self {
-            elements: unsafe { vdupq_n_u16(value) },
+            elements: unsafe { _mm_set1_epi16(value as i16) },
             size: LANE_COUNT,
         }
     }
@@ -39,7 +42,7 @@ impl SimdVec<u16> for U16x8 {
         assert!(size == LANE_COUNT, "{}", msg);
 
         Self {
-            elements: unsafe { vld1q_u16(ptr) },
+            elements: unsafe { _mm_loadu_si128(ptr as *const __m128i) },
             size,
         }
     }
@@ -47,59 +50,77 @@ impl SimdVec<u16> for U16x8 {
     unsafe fn load_partial(ptr: *const u16, size: usize) -> Self {
         let msg = format!("Size must be < {}", LANE_COUNT);
         assert!(size < LANE_COUNT, "{}", msg);
-        // Start with a zero vector
-        let mut elements = vdupq_n_u16(0);
 
-        // Load elements individually using vsetq_lane
-        match size {
-            1 => {
-                elements = vsetq_lane_u16(*ptr.add(0), elements, 0);
-            }
-            2 => {
-                elements = vsetq_lane_u16(*ptr.add(0), elements, 0);
-                elements = vsetq_lane_u16(*ptr.add(1), elements, 1);
-            }
-            3 => {
-                elements = vsetq_lane_u16(*ptr.add(0), elements, 0);
-                elements = vsetq_lane_u16(*ptr.add(1), elements, 1);
-                elements = vsetq_lane_u16(*ptr.add(2), elements, 2);
-            }
-            4 => {
-                elements = vsetq_lane_u16(*ptr.add(0), elements, 0);
-                elements = vsetq_lane_u16(*ptr.add(1), elements, 1);
-                elements = vsetq_lane_u16(*ptr.add(2), elements, 2);
-                elements = vsetq_lane_u16(*ptr.add(3), elements, 3);
-            }
-            5 => {
-                elements = vsetq_lane_u16(*ptr.add(0), elements, 0);
-                elements = vsetq_lane_u16(*ptr.add(1), elements, 1);
-                elements = vsetq_lane_u16(*ptr.add(2), elements, 2);
-                elements = vsetq_lane_u16(*ptr.add(3), elements, 3);
-                elements = vsetq_lane_u16(*ptr.add(4), elements, 4);
-            }
-            6 => {
-                elements = vsetq_lane_u16(*ptr.add(0), elements, 0);
-                elements = vsetq_lane_u16(*ptr.add(1), elements, 1);
-                elements = vsetq_lane_u16(*ptr.add(2), elements, 2);
-                elements = vsetq_lane_u16(*ptr.add(3), elements, 3);
-                elements = vsetq_lane_u16(*ptr.add(4), elements, 4);
-                elements = vsetq_lane_u16(*ptr.add(5), elements, 5);
-            }
-            7 => {
-                elements = vsetq_lane_u16(*ptr.add(0), elements, 0);
-                elements = vsetq_lane_u16(*ptr.add(1), elements, 1);
-                elements = vsetq_lane_u16(*ptr.add(2), elements, 2);
-                elements = vsetq_lane_u16(*ptr.add(3), elements, 3);
-                elements = vsetq_lane_u16(*ptr.add(4), elements, 4);
-                elements = vsetq_lane_u16(*ptr.add(5), elements, 5);
-                elements = vsetq_lane_u16(*ptr.add(6), elements, 6);
-            }
+        let elements = match size {
+            1 => unsafe { _mm_set_epi16(0, 0, 0, 0, 0, 0, 0, *ptr.add(0) as i16) },
+            2 => unsafe { _mm_set_epi16(0, 0, 0, 0, 0, 0, *ptr.add(1) as i16, *ptr.add(0) as i16) },
+            3 => unsafe {
+                _mm_set_epi16(
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    *ptr.add(2) as i16,
+                    *ptr.add(1) as i16,
+                    *ptr.add(0) as i16,
+                )
+            },
+            4 => unsafe {
+                _mm_set_epi16(
+                    0,
+                    0,
+                    0,
+                    0,
+                    *ptr.add(3) as i16,
+                    *ptr.add(2) as i16,
+                    *ptr.add(1) as i16,
+                    *ptr.add(0) as i16,
+                )
+            },
+            5 => unsafe {
+                _mm_set_epi16(
+                    0,
+                    0,
+                    0,
+                    *ptr.add(4) as i16,
+                    *ptr.add(3) as i16,
+                    *ptr.add(2) as i16,
+                    *ptr.add(1) as i16,
+                    *ptr.add(0) as i16,
+                )
+            },
+            6 => unsafe {
+                _mm_set_epi16(
+                    0,
+                    0,
+                    *ptr.add(5) as i16,
+                    *ptr.add(4) as i16,
+                    *ptr.add(3) as i16,
+                    *ptr.add(2) as i16,
+                    *ptr.add(1) as i16,
+                    *ptr.add(0) as i16,
+                )
+            },
+            7 => unsafe {
+                _mm_set_epi16(
+                    0,
+                    *ptr.add(6) as i16,
+                    *ptr.add(5) as i16,
+                    *ptr.add(4) as i16,
+                    *ptr.add(3) as i16,
+                    *ptr.add(2) as i16,
+                    *ptr.add(1) as i16,
+                    *ptr.add(0) as i16,
+                )
+            },
 
             _ => {
                 let msg = "WTF is happening here";
                 panic!("{}", msg);
             }
-        }
+        };
+
         Self { elements, size }
     }
 
@@ -111,7 +132,7 @@ impl SimdVec<u16> for U16x8 {
         let mut vec = vec![0u16; LANE_COUNT];
 
         unsafe {
-            vst1q_u16(vec.as_mut_ptr(), self.elements);
+            _mm_storeu_si128(vec.as_mut_ptr() as *mut __m128i, self.elements);
         }
 
         vec
@@ -133,7 +154,7 @@ impl SimdVec<u16> for U16x8 {
         assert!(self.size == LANE_COUNT, "{}", msg);
 
         unsafe {
-            vst1q_u16(ptr, self.elements);
+            _mm_storeu_si128(ptr as *mut __m128i, self.elements);
         }
     }
 
@@ -142,52 +163,47 @@ impl SimdVec<u16> for U16x8 {
 
         assert!(self.size < LANE_COUNT, "{}", msg);
 
-        match self.size {
-            1 => *ptr.add(0) = vgetq_lane_u16(self.elements, 0),
-            2 => {
-                *ptr.add(0) = vgetq_lane_u16(self.elements, 0);
-                *ptr.add(1) = vgetq_lane_u16(self.elements, 1);
-            }
-            3 => {
-                *ptr.add(0) = vgetq_lane_u16(self.elements, 0);
-                *ptr.add(1) = vgetq_lane_u16(self.elements, 1);
-                *ptr.add(2) = vgetq_lane_u16(self.elements, 2);
-            }
-            4 => {
-                *ptr.add(0) = vgetq_lane_u16(self.elements, 0);
-                *ptr.add(1) = vgetq_lane_u16(self.elements, 1);
-                *ptr.add(2) = vgetq_lane_u16(self.elements, 2);
-                *ptr.add(3) = vgetq_lane_u16(self.elements, 3);
-            }
-            5 => {
-                *ptr.add(0) = vgetq_lane_u16(self.elements, 0);
-                *ptr.add(1) = vgetq_lane_u16(self.elements, 1);
-                *ptr.add(2) = vgetq_lane_u16(self.elements, 2);
-                *ptr.add(3) = vgetq_lane_u16(self.elements, 3);
-                *ptr.add(4) = vgetq_lane_u16(self.elements, 4);
-            }
-            6 => {
-                *ptr.add(0) = vgetq_lane_u16(self.elements, 0);
-                *ptr.add(1) = vgetq_lane_u16(self.elements, 1);
-                *ptr.add(2) = vgetq_lane_u16(self.elements, 2);
-                *ptr.add(3) = vgetq_lane_u16(self.elements, 3);
-                *ptr.add(4) = vgetq_lane_u16(self.elements, 4);
-                *ptr.add(5) = vgetq_lane_u16(self.elements, 5);
-            }
-            7 => {
-                *ptr.add(0) = vgetq_lane_u16(self.elements, 0);
-                *ptr.add(1) = vgetq_lane_u16(self.elements, 1);
-                *ptr.add(2) = vgetq_lane_u16(self.elements, 2);
-                *ptr.add(3) = vgetq_lane_u16(self.elements, 3);
-                *ptr.add(4) = vgetq_lane_u16(self.elements, 4);
-                *ptr.add(5) = vgetq_lane_u16(self.elements, 5);
-                *ptr.add(6) = vgetq_lane_u16(self.elements, 6);
-            }
+        let blended = match self.size {
+            1 => _mm_blend_epi16(
+                _mm_loadu_si128(ptr as *const __m128i),
+                self.elements,
+                0b0000_0001,
+            ),
+            2 => _mm_blend_epi16(
+                _mm_loadu_si128(ptr as *const __m128i),
+                self.elements,
+                0b0000_0011,
+            ),
+            3 => _mm_blend_epi16(
+                _mm_loadu_si128(ptr as *const __m128i),
+                self.elements,
+                0b0000_0111,
+            ),
+            4 => _mm_blend_epi16(
+                _mm_loadu_si128(ptr as *const __m128i),
+                self.elements,
+                0b0000_1111,
+            ),
+            5 => _mm_blend_epi16(
+                _mm_loadu_si128(ptr as *const __m128i),
+                self.elements,
+                0b0001_1111,
+            ),
+            6 => _mm_blend_epi16(
+                _mm_loadu_si128(ptr as *const __m128i),
+                self.elements,
+                0b0011_1111,
+            ),
+            7 => _mm_blend_epi16(
+                _mm_loadu_si128(ptr as *const __m128i),
+                self.elements,
+                0b0111_1111,
+            ),
+            _ => panic!("Invalid size"),
+        };
 
-            _ => {
-                let msg = "WTF is happening here";
-                panic!("{}", msg);
-            }
+        unsafe {
+            _mm_storeu_si128(ptr as *mut __m128i, blended);
         }
     }
 
@@ -212,8 +228,7 @@ impl SimdVec<u16> for U16x8 {
         );
 
         // Compare a == b elementwise
-        let elements = unsafe { vceqq_u16(self.elements, rhs.elements) };
-
+        let elements = unsafe { _mm_cmpeq_epi16(self.elements, rhs.elements) };
         Self {
             elements,
             size: self.size,
@@ -230,7 +245,7 @@ impl SimdVec<u16> for U16x8 {
         );
 
         // Compare a<b elementwise
-        let elements = unsafe { vcltq_u16(self.elements, rhs.elements) };
+        let elements = unsafe { _mm_cmplt_epi16(self.elements, rhs.elements) };
 
         Self {
             elements,
@@ -248,7 +263,9 @@ impl SimdVec<u16> for U16x8 {
         );
 
         // Compare a<=b elementwise
-        let elements = unsafe { vcleq_u16(self.elements, rhs.elements) };
+        let less_than = unsafe { _mm_cmplt_epi16(self.elements, rhs.elements) };
+        let equal = unsafe { _mm_cmpeq_epi16(self.elements, rhs.elements) };
+        let elements = unsafe { _mm_or_si128(less_than, equal) };
 
         Self {
             elements,
@@ -266,7 +283,7 @@ impl SimdVec<u16> for U16x8 {
         );
 
         // Compare a>b elementwise
-        let elements = unsafe { vcgtq_u16(self.elements, rhs.elements) };
+        let elements = unsafe { _mm_cmpgt_epi16(self.elements, rhs.elements) }; // Result as float mask
 
         Self {
             elements,
@@ -284,7 +301,9 @@ impl SimdVec<u16> for U16x8 {
         );
 
         // Compare a>=b elementwise
-        let elements = unsafe { vcgeq_u16(self.elements, rhs.elements) };
+        let greater_than = unsafe { _mm_cmpgt_epi16(self.elements, rhs.elements) };
+        let equal = unsafe { _mm_cmpeq_epi16(self.elements, rhs.elements) };
+        let elements = unsafe { _mm_or_si128(greater_than, equal) };
 
         Self {
             elements,
@@ -309,7 +328,7 @@ impl Add for U16x8 {
         unsafe {
             U16x8 {
                 size: self.size,
-                elements: vaddq_u16(self.elements, rhs.elements),
+                elements: _mm_add_epi16(self.elements, rhs.elements),
             }
         }
     }
@@ -346,7 +365,7 @@ impl Sub for U16x8 {
         unsafe {
             U16x8 {
                 size: self.size,
-                elements: vsubq_u16(self.elements, rhs.elements),
+                elements: _mm_sub_epi16(self.elements, rhs.elements),
             }
         }
     }
@@ -380,11 +399,12 @@ impl Mul for U16x8 {
             rhs.size
         );
 
-        unsafe {
-            U16x8 {
-                size: self.size,
-                elements: vmulq_u16(self.elements, rhs.elements),
-            }
+        // Pack 16-bit products into 8-bit integers with saturation
+        let elements = unsafe { _mm_mullo_epi16(self.elements, rhs.elements) };
+
+        U16x8 {
+            size: self.size,
+            elements,
         }
     }
 }
@@ -417,11 +437,10 @@ impl PartialEq for U16x8 {
 
         unsafe {
             // Compare lane-by-lane
-            let cmp = vceqq_u16(self.elements, other.elements);
+            let cmp = _mm_cmpeq_epi16(self.elements, other.elements);
 
-            // Reinterpret result as float for mask extraction
-            // let mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_u16(vreinterpretq_u16_u8(cmp))), 0);
-            let mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_u16(cmp)), 0);
+            // Move the mask to integer form
+            let mask = _mm_movemask_epi8(cmp);
 
             // All 4 lanes equal => mask == 0b1111 == 0xF
             mask == 0xF
@@ -444,14 +463,9 @@ impl PartialOrd for U16x8 {
             let gt = self.gt_elements(*other).elements;
             let eq = self.eq_elements(*other).elements;
 
-            let lt_mask = vandq_u32(vreinterpretq_u32_u16(lt), vdupq_n_u32(0x1));
-            let gt_mask = vandq_u32(vreinterpretq_u32_u16(gt), vdupq_n_u32(0x1));
-            let eq_mask = vandq_u32(vreinterpretq_u32_u16(eq), vdupq_n_u32(0x1));
-
-            // Compare element-wise using NEON intrinsics
-            let lt_mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_u32(lt_mask)), 0);
-            let gt_mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_u32(gt_mask)), 0);
-            let eq_mask = vget_lane_u32(vmovn_u64(vreinterpretq_u64_u32(eq_mask)), 0);
+            let lt_mask = _mm_movemask_epi8(lt);
+            let gt_mask = _mm_movemask_epi8(gt);
+            let eq_mask = _mm_movemask_epi8(eq);
 
             match (lt_mask, gt_mask, eq_mask) {
                 (0xF, 0x0, _) => Some(std::cmp::Ordering::Less), // all lanes less
@@ -510,12 +524,11 @@ impl BitAnd for U16x8 {
             rhs.size
         );
 
-        // Perform bitwise AND between the two uint32x4_t vectors
-        let elements = unsafe { vandq_u16(self.elements, rhs.elements) };
-
-        U16x8 {
-            size: self.size,
-            elements,
+        unsafe {
+            U16x8 {
+                size: self.size,
+                elements: _mm_and_si128(self.elements, rhs.elements),
+            }
         }
     }
 }
@@ -548,11 +561,11 @@ impl BitOr for U16x8 {
             rhs.size
         );
 
-        let elements = unsafe { vorrq_u16(self.elements, rhs.elements) };
-
-        U16x8 {
-            size: self.size,
-            elements,
+        unsafe {
+            U16x8 {
+                size: self.size,
+                elements: _mm_or_si128(self.elements, rhs.elements),
+            }
         }
     }
 }
