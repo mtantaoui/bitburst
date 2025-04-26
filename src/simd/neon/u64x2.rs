@@ -501,7 +501,7 @@ impl BitOrAssign for U64x2 {
 }
 
 #[cfg(test)]
-mod U64x2_tests {
+mod u64x2_tests {
     use std::{cmp::min, vec};
 
     use super::*;
