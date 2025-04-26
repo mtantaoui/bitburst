@@ -1307,12 +1307,12 @@ mod u8x16_tests {
 
     #[test]
     fn test_sub_assign() {
-        let mut a = U8x16::new(&[1, 2, 3, 4]);
-        let b = U8x16::new(&[4, 3, 2, 1]);
+        let mut a = U8x16::new(&[4, 2, 3, 4]);
+        let b = U8x16::new(&[4, 1, 2, 1]);
 
         a -= b;
 
-        assert_eq!(vec![3, 1, 1, 3], a.to_vec());
+        assert_eq!(vec![0, 1, 1, 3], a.to_vec());
     }
 
     #[allow(clippy::identity_op)]
