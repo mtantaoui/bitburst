@@ -205,9 +205,9 @@ impl PlatformDetector {
             })
             .unwrap_or_else(|| "fallback");
 
-        println!("applying: {}", cfg_flag);
+        println!("applying: {cfg_flag}");
 
-        println!("cargo:rustc-cfg={}", cfg_flag);
+        println!("cargo:rustc-cfg={cfg_flag}");
 
         // Avoid `#[cfg(...)]` on different architectures implementations
         println!("cargo::rustc-check-cfg=cfg(avx512)");
@@ -224,7 +224,7 @@ fn main() {
 
     // Create a flag for modules that can be used in nighlty build only
     // Some features like avx512 are available only with nighlty build
-    println!("cargo:rustc-cfg=rustc_channel=\"{}\"", rustc_channel);
+    println!("cargo:rustc-cfg=rustc_channel=\"{rustc_channel}\"");
 
     // Disable flag warnings for build
     println!("cargo::rustc-check-cfg=cfg(rustc_channel, values(\"nightly\", \"stable\"))");

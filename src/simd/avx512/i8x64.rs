@@ -38,7 +38,7 @@ impl SimdVec<i8> for I8x64 {
     }
 
     unsafe fn load(ptr: *const i8, size: usize) -> Self {
-        let msg = format!("Size must be == {}", LANE_COUNT);
+        let msg = format!("Size must be == {LANE_COUNT}");
         assert!(size == LANE_COUNT, "{}", msg);
 
         Self {
@@ -48,7 +48,7 @@ impl SimdVec<i8> for I8x64 {
     }
 
     unsafe fn load_partial(ptr: *const i8, size: usize) -> Self {
-        let msg = format!("Size must be < {}", LANE_COUNT);
+        let msg = format!("Size must be < {LANE_COUNT}");
         assert!(size < LANE_COUNT, "{}", msg);
 
         let mask = (1 << size) - 1;
@@ -60,7 +60,7 @@ impl SimdVec<i8> for I8x64 {
     }
 
     fn store(&self) -> Vec<i8> {
-        let msg = format!("Size must be <= {}", LANE_COUNT);
+        let msg = format!("Size must be <= {LANE_COUNT}");
 
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
@@ -84,7 +84,7 @@ impl SimdVec<i8> for I8x64 {
     }
 
     unsafe fn store_at(&self, ptr: *mut i8) {
-        let msg = format!("Size must be == {}", LANE_COUNT);
+        let msg = format!("Size must be == {LANE_COUNT}");
 
         assert!(self.size == LANE_COUNT, "{}", msg);
 
@@ -94,7 +94,7 @@ impl SimdVec<i8> for I8x64 {
     }
 
     unsafe fn store_at_partial(&self, ptr: *mut i8) {
-        let msg = format!("Size must be < {}", LANE_COUNT);
+        let msg = format!("Size must be < {LANE_COUNT}");
 
         assert!(self.size < LANE_COUNT, "{}", msg);
 
@@ -104,7 +104,7 @@ impl SimdVec<i8> for I8x64 {
     }
 
     fn to_vec(self) -> Vec<i8> {
-        let msg = format!("Size must be <= {}", LANE_COUNT);
+        let msg = format!("Size must be <= {LANE_COUNT}");
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
         if self.size == LANE_COUNT {
