@@ -19,6 +19,7 @@ pub struct F32x16 {
 }
 
 impl SimdVec<f32> for F32x16 {
+    #[inline(always)]
     fn new(slice: &[f32]) -> Self {
         assert!(!slice.is_empty(), "Size can't be zero");
 
@@ -30,6 +31,7 @@ impl SimdVec<f32> for F32x16 {
         }
     }
 
+    #[inline(always)]
     fn splat(value: f32) -> Self {
         Self {
             elements: unsafe { _mm512_set1_ps(value) },
@@ -37,6 +39,7 @@ impl SimdVec<f32> for F32x16 {
         }
     }
 
+    #[inline(always)]
     unsafe fn load(ptr: *const f32, size: usize) -> Self {
         let msg = format!("Size must be == {LANE_COUNT}");
         assert!(size == LANE_COUNT, "{}", msg);
@@ -60,6 +63,7 @@ impl SimdVec<f32> for F32x16 {
         }
     }
 
+    #[inline(always)]
     fn store(&self) -> Vec<f32> {
         let msg = format!("Size must be <= {LANE_COUNT}");
 
@@ -74,6 +78,7 @@ impl SimdVec<f32> for F32x16 {
         vec
     }
 
+    #[inline(always)]
     fn store_partial(&self) -> Vec<f32> {
         match self.size {
             1..LANE_COUNT => self.store().into_iter().take(self.size).collect(),
@@ -84,6 +89,7 @@ impl SimdVec<f32> for F32x16 {
         }
     }
 
+    #[inline(always)]
     unsafe fn store_at(&self, ptr: *mut f32) {
         let msg = format!("Size must be <= {LANE_COUNT}");
 
@@ -94,6 +100,7 @@ impl SimdVec<f32> for F32x16 {
         }
     }
 
+    #[inline(always)]
     unsafe fn store_at_partial(&self, ptr: *mut f32) {
         let msg = format!("Size must be < {LANE_COUNT}");
 
@@ -104,6 +111,7 @@ impl SimdVec<f32> for F32x16 {
         _mm512_mask_storeu_ps(ptr, mask, self.elements);
     }
 
+    #[inline(always)]
     fn to_vec(self) -> Vec<f32> {
         let msg = format!("Size must be <= {LANE_COUNT}");
         assert!(self.size <= LANE_COUNT, "{}", msg);
@@ -115,6 +123,7 @@ impl SimdVec<f32> for F32x16 {
         }
     }
 
+    #[inline(always)]
     fn eq_elements(&self, rhs: Self) -> Self {
         assert!(
             self.size == rhs.size,
@@ -135,6 +144,7 @@ impl SimdVec<f32> for F32x16 {
         }
     }
 
+    #[inline(always)]
     fn lt_elements(&self, rhs: Self) -> Self {
         assert!(
             self.size == rhs.size,
@@ -155,6 +165,7 @@ impl SimdVec<f32> for F32x16 {
         }
     }
 
+    #[inline(always)]
     fn le_elements(&self, rhs: Self) -> Self {
         assert!(
             self.size == rhs.size,
@@ -175,6 +186,7 @@ impl SimdVec<f32> for F32x16 {
         }
     }
 
+    #[inline(always)]
     fn gt_elements(&self, rhs: Self) -> Self {
         assert!(
             self.size == rhs.size,
@@ -194,7 +206,7 @@ impl SimdVec<f32> for F32x16 {
             size: self.size,
         }
     }
-
+    #[inline(always)]
     fn ge_elements(&self, rhs: Self) -> Self {
         assert!(
             self.size == rhs.size,
@@ -219,7 +231,7 @@ impl SimdVec<f32> for F32x16 {
 impl Add for F32x16 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn add(self, rhs: Self) -> Self::Output {
         assert!(
             self.size == rhs.size,
@@ -239,7 +251,7 @@ impl Add for F32x16 {
 }
 
 impl AddAssign for F32x16 {
-    #[inline]
+    #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
         assert!(
             self.size == rhs.size,
@@ -256,7 +268,7 @@ impl AddAssign for F32x16 {
 impl Sub for F32x16 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn sub(self, rhs: Self) -> Self::Output {
         assert!(
             self.size == rhs.size,
@@ -276,7 +288,7 @@ impl Sub for F32x16 {
 }
 
 impl SubAssign for F32x16 {
-    #[inline]
+    #[inline(always)]
     fn sub_assign(&mut self, rhs: Self) {
         assert!(
             self.size == rhs.size,
@@ -293,7 +305,7 @@ impl SubAssign for F32x16 {
 impl Mul for F32x16 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn mul(self, rhs: Self) -> Self::Output {
         assert!(
             self.size == rhs.size,
@@ -313,7 +325,7 @@ impl Mul for F32x16 {
 }
 
 impl MulAssign for F32x16 {
-    #[inline]
+    #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
         assert!(
             self.size == rhs.size,
@@ -330,7 +342,7 @@ impl MulAssign for F32x16 {
 impl Div for F32x16 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn div(self, rhs: Self) -> Self::Output {
         assert!(
             self.size == rhs.size,
@@ -350,7 +362,7 @@ impl Div for F32x16 {
 }
 
 impl DivAssign for F32x16 {
-    #[inline]
+    #[inline(always)]
     fn div_assign(&mut self, rhs: Self) {
         assert!(
             self.size == rhs.size,
@@ -367,7 +379,7 @@ impl DivAssign for F32x16 {
 impl Rem for F32x16 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn rem(self, rhs: Self) -> Self::Output {
         assert!(
             self.size == rhs.size,
@@ -393,7 +405,7 @@ impl Rem for F32x16 {
 }
 
 impl RemAssign for F32x16 {
-    #[inline]
+    #[inline(always)]
     fn rem_assign(&mut self, rhs: Self) {
         assert!(
             self.size == rhs.size,
@@ -410,6 +422,7 @@ impl RemAssign for F32x16 {
 impl Eq for F32x16 {}
 
 impl PartialEq for F32x16 {
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         assert!(
             self.size == other.size,
@@ -430,6 +443,7 @@ impl PartialEq for F32x16 {
 }
 
 impl PartialOrd for F32x16 {
+    #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         assert!(
             self.size == other.size,
@@ -457,6 +471,7 @@ impl PartialOrd for F32x16 {
         }
     }
 
+    #[inline(always)]
     fn lt(&self, other: &Self) -> bool {
         self
             // comparing elementwise
@@ -467,6 +482,7 @@ impl PartialOrd for F32x16 {
             .all(|&f| f != 0.0)
     }
 
+    #[inline(always)]
     fn le(&self, other: &Self) -> bool {
         self.le_elements(*other)
             .to_vec()
@@ -475,6 +491,7 @@ impl PartialOrd for F32x16 {
             .all(|&f| f != 0.0)
     }
 
+    #[inline(always)]
     fn gt(&self, other: &Self) -> bool {
         self.gt_elements(*other)
             .to_vec()
@@ -483,6 +500,7 @@ impl PartialOrd for F32x16 {
             .all(|&f| f != 0.0)
     }
 
+    #[inline(always)]
     fn ge(&self, other: &Self) -> bool {
         self.ge_elements(*other)
             .to_vec()
@@ -495,7 +513,7 @@ impl PartialOrd for F32x16 {
 impl BitAnd for F32x16 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn bitand(self, rhs: Self) -> Self::Output {
         assert!(
             self.size == rhs.size,
@@ -515,7 +533,7 @@ impl BitAnd for F32x16 {
 }
 
 impl BitAndAssign for F32x16 {
-    #[inline]
+    #[inline(always)]
     fn bitand_assign(&mut self, rhs: Self) {
         assert!(
             self.size == rhs.size,
@@ -532,7 +550,7 @@ impl BitAndAssign for F32x16 {
 impl BitOr for F32x16 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn bitor(self, rhs: Self) -> Self::Output {
         assert!(
             self.size == rhs.size,
@@ -552,7 +570,7 @@ impl BitOr for F32x16 {
 }
 
 impl BitOrAssign for F32x16 {
-    #[inline]
+    #[inline(always)]
     fn bitor_assign(&mut self, rhs: Self) {
         assert!(
             self.size == rhs.size,

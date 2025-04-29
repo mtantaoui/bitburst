@@ -7,6 +7,8 @@ use rayon::slice::ParallelSliceMut;
 
 #[cfg(all(avx512, rustc_channel = "nightly"))]
 pub fn add(a: &[f32], b: &[f32]) -> Vec<f32> {
+    use rayon::slice::ParallelSlice;
+
     let msg = format!(
         "Operands must have the same size lhs size:{}, rhs:{}",
         a.len(),
@@ -20,20 +22,19 @@ pub fn add(a: &[f32], b: &[f32]) -> Vec<f32> {
 
     let mut c = vec![0.0; size];
 
-    c.par_chunks_mut(chunk_size)
-        .enumerate()
-        .for_each(|(i, c_chunk)| {
-            let start = chunk_size * i;
+    a.par_chunks(chunk_size)
+        .zip_eq(b.par_chunks(chunk_size))
+        .zip_eq(c.par_chunks_mut(chunk_size))
+        .for_each(|((a, b), c)| {
+            let a_chunk = F32x16::new(a);
+            let b_chunk = F32x16::new(b);
 
-            let a_chunk = F32x16::new(&a[start..]);
-            let b_chunk = F32x16::new(&b[start..]);
-
-            match c_chunk.len().cmp(&chunk_size) {
+            match c.len().cmp(&chunk_size) {
                 std::cmp::Ordering::Less => unsafe {
-                    (a_chunk + b_chunk).store_at_partial(c_chunk.as_mut_ptr())
+                    (a_chunk + b_chunk).store_at_partial(c.as_mut_ptr())
                 },
                 std::cmp::Ordering::Equal => unsafe {
-                    (a_chunk + b_chunk).store_at(c_chunk.as_mut_ptr())
+                    (a_chunk + b_chunk).store_at(c.as_mut_ptr())
                 },
                 std::cmp::Ordering::Greater => unreachable!(),
             }

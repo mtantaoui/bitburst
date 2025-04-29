@@ -2,7 +2,7 @@ use bitburst::simd::avx512::add::add;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use ndarray::Array1;
 
-const SIZE: usize = 1000;
+const SIZE: usize = 100_000;
 
 // Benchmark: ndarray vector addition
 fn add_ndarray_f32_vectors() {
