@@ -22,11 +22,14 @@ fn add_bitburst_f32_vectors() {
     black_box(result);
 }
 
-fn benchmark_vector_additions(c: &mut Criterion) {
-    c.bench_function("ndarray vector add", |b| b.iter(add_ndarray_f32_vectors));
+fn add_f32_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Vector Add Comparison");
 
-    c.bench_function("bitburst vector add", |b| b.iter(add_bitburst_f32_vectors));
+    group.bench_function("ndarray vector add", |b| b.iter(add_ndarray_f32_vectors));
+    group.bench_function("bitburst vector add", |b| b.iter(add_bitburst_f32_vectors));
+
+    group.finish();
 }
 
-criterion_group!(benches, benchmark_vector_additions);
+criterion_group!(benches, add_f32_benchmark);
 criterion_main!(benches);
