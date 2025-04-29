@@ -9,13 +9,13 @@ use std::ops::{
 
 use crate::simd::vec::SimdVec;
 
-pub const LANE_COUNT: usize = 8;
+pub const LANE_COUNT: usize = 16;
 
 /// A SIMD vector of 4 32-bit floating point values
 #[derive(Copy, Clone, Debug)]
 pub struct U32x16 {
     size: usize,
-    elements: __m256i,
+    elements: __m512i,
 }
 
 impl SimdVec<u32> for U32x16 {
@@ -32,109 +32,42 @@ impl SimdVec<u32> for U32x16 {
 
     fn splat(value: u32) -> Self {
         Self {
-            elements: unsafe { _mm256_set1_epi32(value as i32) },
+            elements: unsafe { _mm512_set1_epi32(value as i32) },
             size: LANE_COUNT,
         }
     }
 
     unsafe fn load(ptr: *const u32, size: usize) -> Self {
-        let msg = format!("Size must be == {}", LANE_COUNT);
+        let msg = format!("Size must be == {LANE_COUNT}");
         assert!(size == LANE_COUNT, "{}", msg);
 
         Self {
-            elements: unsafe { _mm256_loadu_si256(ptr as *const __m256i) },
+            elements: unsafe { _mm512_loadu_si512(ptr as *const __m512i) },
             size,
         }
     }
 
     unsafe fn load_partial(ptr: *const u32, size: usize) -> Self {
-        let msg = format!("Size must be < {}", LANE_COUNT);
+        let msg = format!("Size must be < {LANE_COUNT}");
         assert!(size < LANE_COUNT, "{}", msg);
 
-        let elements = match size {
-            1 => unsafe { _mm256_set_epi32(0, 0, 0, 0, 0, 0, 0, *ptr.add(0) as i32) },
-            2 => unsafe {
-                _mm256_set_epi32(0, 0, 0, 0, 0, 0, *ptr.add(1) as i32, *ptr.add(0) as i32)
-            },
-            3 => unsafe {
-                _mm256_set_epi32(
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    *ptr.add(2) as i32,
-                    *ptr.add(1) as i32,
-                    *ptr.add(0) as i32,
-                )
-            },
-            4 => unsafe {
-                _mm256_set_epi32(
-                    0,
-                    0,
-                    0,
-                    0,
-                    *ptr.add(3) as i32,
-                    *ptr.add(2) as i32,
-                    *ptr.add(1) as i32,
-                    *ptr.add(0) as i32,
-                )
-            },
-            5 => unsafe {
-                _mm256_set_epi32(
-                    0,
-                    0,
-                    0,
-                    *ptr.add(4) as i32,
-                    *ptr.add(3) as i32,
-                    *ptr.add(2) as i32,
-                    *ptr.add(1) as i32,
-                    *ptr.add(0) as i32,
-                )
-            },
-            6 => unsafe {
-                _mm256_set_epi32(
-                    0,
-                    0,
-                    *ptr.add(5) as i32,
-                    *ptr.add(4) as i32,
-                    *ptr.add(3) as i32,
-                    *ptr.add(2) as i32,
-                    *ptr.add(1) as i32,
-                    *ptr.add(0) as i32,
-                )
-            },
-            7 => unsafe {
-                _mm256_set_epi32(
-                    0,
-                    *ptr.add(6) as i32,
-                    *ptr.add(5) as i32,
-                    *ptr.add(4) as i32,
-                    *ptr.add(3) as i32,
-                    *ptr.add(2) as i32,
-                    *ptr.add(1) as i32,
-                    *ptr.add(0) as i32,
-                )
-            },
+        let mask = (1 << size) - 1;
 
-            _ => {
-                let msg = "WTF is happening here";
-                panic!("{}", msg);
-            }
-        };
-
-        Self { elements, size }
+        Self {
+            elements: unsafe { _mm512_maskz_loadu_epi32(mask, ptr as *const i32) },
+            size,
+        }
     }
 
     fn store(&self) -> Vec<u32> {
-        let msg = format!("Size must be <= {}", LANE_COUNT);
+        let msg = format!("Size must be <= {LANE_COUNT}");
 
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
         let mut vec = vec![0u32; LANE_COUNT];
 
         unsafe {
-            _mm256_storeu_si256(vec.as_mut_ptr() as *mut __m256i, self.elements);
+            _mm512_storeu_si512(vec.as_mut_ptr() as *mut __m512i, self.elements);
         }
 
         vec
@@ -151,67 +84,27 @@ impl SimdVec<u32> for U32x16 {
     }
 
     unsafe fn store_at(&self, ptr: *mut u32) {
-        let msg = format!("Size must be == {}", LANE_COUNT);
+        let msg = format!("Size must be == {LANE_COUNT}");
 
         assert!(self.size == LANE_COUNT, "{}", msg);
 
         unsafe {
-            _mm256_storeu_si256(ptr as *mut __m256i, self.elements);
+            _mm512_storeu_si512(ptr as *mut __m512i, self.elements);
         }
     }
 
     unsafe fn store_at_partial(&self, ptr: *mut u32) {
-        let msg = format!("Size must be < {}", LANE_COUNT);
+        let msg = format!("Size must be < {LANE_COUNT}");
 
         assert!(self.size < LANE_COUNT, "{}", msg);
 
-        let blended = match self.size {
-            1 => _mm256_blend_epi32(
-                _mm256_loadu_si256(ptr as *const __m256i),
-                self.elements,
-                0b0000_0001,
-            ),
-            2 => _mm256_blend_epi32(
-                _mm256_loadu_si256(ptr as *const __m256i),
-                self.elements,
-                0b0000_0011,
-            ),
-            3 => _mm256_blend_epi32(
-                _mm256_loadu_si256(ptr as *const __m256i),
-                self.elements,
-                0b0000_0111,
-            ),
-            4 => _mm256_blend_epi32(
-                _mm256_loadu_si256(ptr as *const __m256i),
-                self.elements,
-                0b0000_1111,
-            ),
-            5 => _mm256_blend_epi32(
-                _mm256_loadu_si256(ptr as *const __m256i),
-                self.elements,
-                0b0001_1111,
-            ),
-            6 => _mm256_blend_epi32(
-                _mm256_loadu_si256(ptr as *const __m256i),
-                self.elements,
-                0b0011_1111,
-            ),
-            7 => _mm256_blend_epi32(
-                _mm256_loadu_si256(ptr as *const __m256i),
-                self.elements,
-                0b0111_1111,
-            ),
+        let mask = (1 << self.size) - 1;
 
-            _ => panic!("Invalid size"),
-        };
-
-        unsafe {
-            _mm256_storeu_si256(ptr as *mut __m256i, blended);
-        }
+        _mm512_mask_storeu_epi32(ptr as *mut i32, mask, self.elements);
     }
 
     fn to_vec(self) -> Vec<u32> {
-        let msg = format!("Size must be <= {}", LANE_COUNT);
+        let msg = format!("Size must be <= {LANE_COUNT}");
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
         if self.size == LANE_COUNT {
@@ -231,7 +124,9 @@ impl SimdVec<u32> for U32x16 {
         );
 
         // Compare a == b elementwise
-        let elements = unsafe { _mm256_cmpeq_epi32(self.elements, rhs.elements) };
+        let mask = unsafe { _mm512_cmpeq_epi32_mask(self.elements, rhs.elements) };
+        let elements = unsafe { _mm512_movm_epi32(mask) };
+
         Self {
             elements,
             size: self.size,
@@ -248,7 +143,8 @@ impl SimdVec<u32> for U32x16 {
         );
 
         // Compare a<b elementwise
-        let elements = unsafe { _mm256_cmpgt_epi32(rhs.elements, self.elements) };
+        let mask = unsafe { _mm512_cmplt_epi32_mask(self.elements, rhs.elements) };
+        let elements = unsafe { _mm512_movm_epi32(mask) };
 
         Self {
             elements,
@@ -266,9 +162,8 @@ impl SimdVec<u32> for U32x16 {
         );
 
         // Compare a<=b elementwise
-        let less_than = unsafe { _mm256_cmpgt_epi32(rhs.elements, self.elements) };
-        let equal = unsafe { _mm256_cmpeq_epi32(self.elements, rhs.elements) };
-        let elements = unsafe { _mm256_or_si256(less_than, equal) };
+        let mask = unsafe { _mm512_cmple_epi32_mask(self.elements, rhs.elements) };
+        let elements = unsafe { _mm512_movm_epi32(mask) };
 
         Self {
             elements,
@@ -286,7 +181,8 @@ impl SimdVec<u32> for U32x16 {
         );
 
         // Compare a>b elementwise
-        let elements = unsafe { _mm256_cmpgt_epi32(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { _mm512_cmpgt_epi32_mask(self.elements, rhs.elements) };
+        let elements = unsafe { _mm512_movm_epi32(mask) };
 
         Self {
             elements,
@@ -304,9 +200,8 @@ impl SimdVec<u32> for U32x16 {
         );
 
         // Compare a>=b elementwise
-        let greater_than = unsafe { _mm256_cmpgt_epi32(self.elements, rhs.elements) };
-        let equal = unsafe { _mm256_cmpeq_epi32(self.elements, rhs.elements) };
-        let elements = unsafe { _mm256_or_si256(greater_than, equal) };
+        let mask = unsafe { _mm512_cmpge_epi32_mask(self.elements, rhs.elements) };
+        let elements = unsafe { _mm512_movm_epi32(mask) };
 
         Self {
             elements,
@@ -331,7 +226,7 @@ impl Add for U32x16 {
         unsafe {
             U32x16 {
                 size: self.size,
-                elements: _mm256_add_epi32(self.elements, rhs.elements),
+                elements: _mm512_add_epi32(self.elements, rhs.elements),
             }
         }
     }
@@ -368,7 +263,7 @@ impl Sub for U32x16 {
         unsafe {
             U32x16 {
                 size: self.size,
-                elements: _mm256_sub_epi32(self.elements, rhs.elements),
+                elements: _mm512_sub_epi32(self.elements, rhs.elements),
             }
         }
     }
@@ -403,7 +298,7 @@ impl Mul for U32x16 {
         );
 
         // Pack 16-bit products into 8-bit integers with saturation
-        let elements = unsafe { _mm256_mullo_epi32(self.elements, rhs.elements) };
+        let elements = unsafe { _mm512_mullo_epi32(self.elements, rhs.elements) };
 
         U32x16 {
             size: self.size,
@@ -440,10 +335,7 @@ impl PartialEq for U32x16 {
 
         unsafe {
             // Compare lane-by-lane
-            let cmp = _mm256_cmpeq_epi32(self.elements, other.elements);
-
-            // Move the mask to integer form
-            let mask = _mm256_movemask_epi8(cmp);
+            let mask = _mm512_cmpeq_epi32_mask(self.elements, other.elements);
 
             // All 4 lanes equal => mask == 0b1111 == 0xF
             mask == 0xF
@@ -466,9 +358,9 @@ impl PartialOrd for U32x16 {
             let gt = self.gt_elements(*other).elements;
             let eq = self.eq_elements(*other).elements;
 
-            let lt_mask = _mm256_movemask_epi8(lt);
-            let gt_mask = _mm256_movemask_epi8(gt);
-            let eq_mask = _mm256_movemask_epi8(eq);
+            let lt_mask = _mm512_reduce_and_epi64(lt);
+            let gt_mask = _mm512_reduce_and_epi64(gt);
+            let eq_mask = _mm512_reduce_and_epi64(eq);
 
             match (lt_mask, gt_mask, eq_mask) {
                 (0xF, 0x0, _) => Some(std::cmp::Ordering::Less), // all lanes less
@@ -530,7 +422,7 @@ impl BitAnd for U32x16 {
         unsafe {
             U32x16 {
                 size: self.size,
-                elements: _mm256_and_si256(self.elements, rhs.elements),
+                elements: _mm512_and_si512(self.elements, rhs.elements),
             }
         }
     }
@@ -567,7 +459,7 @@ impl BitOr for U32x16 {
         unsafe {
             U32x16 {
                 size: self.size,
-                elements: _mm256_or_si256(self.elements, rhs.elements),
+                elements: _mm512_or_si512(self.elements, rhs.elements),
             }
         }
     }
@@ -589,14 +481,14 @@ impl BitOrAssign for U32x16 {
 }
 
 #[cfg(test)]
-mod u32x8_tests {
+mod u32x16_tests {
     use std::{cmp::min, vec};
 
     use super::*;
 
     #[test]
-    /// __m256i fields are private and cannot be compared directly
-    /// test consist on loading elements to __m256i then fetching them using .to_vec method
+    /// __m512i fields are private and cannot be compared directly
+    /// test consist on loading elements to __m512i then fetching them using .to_vec method
     /// implicitly tests load, load_partial, store, store_partial and to_vec methods
     fn test_new() {
         let n = 20;
@@ -618,10 +510,10 @@ mod u32x8_tests {
         });
     }
 
-    /// Splat method should duplicate one value for all elements of __m128
+    /// Splat method should duplicate one value for all elements of __m256
     #[test]
     fn test_splat() {
-        let a = vec![1; 8];
+        let a = vec![1; 16];
 
         let v = U32x16::splat(1);
 
@@ -632,13 +524,13 @@ mod u32x8_tests {
     fn test_store_at() {
         let mut a1: Vec<u32> = vec![100; 20];
 
-        let s1: Vec<u32> = (1..=8).collect();
+        let s1: Vec<u32> = (1..=16).collect();
         let v1 = U32x16::new(&s1);
 
         unsafe { v1.store_at(a1[0..].as_mut_ptr()) };
 
         assert_eq!(
-            &[1, 2, 3, 4, 5, 6, 7, 8, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100],
+            &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 100, 100, 100, 100],
             a1.as_slice()
         );
 
@@ -650,7 +542,7 @@ mod u32x8_tests {
         unsafe { v2.store_at(a2[4..].as_mut_ptr()) };
 
         assert_eq!(
-            &[1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 1, 1, 1, 1, 1, 1, 1],
+            &[1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
             a2.as_slice()
         );
     }
@@ -753,12 +645,12 @@ mod u32x8_tests {
 
     #[test]
     fn test_sub_assign() {
-        let mut a = U32x16::new(&[4, 2, 3, 4]);
-        let b = U32x16::new(&[1, 2, 2, 1]);
+        let mut a = U32x16::new(&[7, 4, 3, 4]);
+        let b = U32x16::new(&[4, 3, 2, 1]);
 
         a -= b;
 
-        assert_eq!(vec![3, 0, 1, 3], a.to_vec());
+        assert_eq!(vec![3, 1, 1, 3], a.to_vec());
     }
 
     #[allow(clippy::identity_op)]
@@ -851,6 +743,13 @@ mod u32x8_tests {
     fn test_le_elementwise() {
         let v1 = U32x16::new(&[1]);
         let u1 = U32x16::new(&[5]);
+
+        println!(
+            "{:?}",
+            (u1.le_elements(v1)).to_vec() // .iter()
+                                          // .map(|f| *f != 0)
+                                          // .collect::<Vec<bool>>()
+        );
 
         assert_eq!(
             vec![5 <= 1],

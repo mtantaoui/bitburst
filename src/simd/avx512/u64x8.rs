@@ -9,16 +9,16 @@ use std::ops::{
 
 use crate::simd::vec::SimdVec;
 
-pub const LANE_COUNT: usize = 4;
+pub const LANE_COUNT: usize = 8;
 
 /// A SIMD vector of 4 32-bit floating point values
 #[derive(Copy, Clone, Debug)]
-pub struct U64x4 {
+pub struct U64x8 {
     size: usize,
-    elements: __m256i,
+    elements: __m512i,
 }
 
-impl SimdVec<u64> for U64x4 {
+impl SimdVec<u64> for U64x8 {
     fn new(slice: &[u64]) -> Self {
         assert!(!slice.is_empty(), "Size can't be zero");
 
@@ -32,54 +32,42 @@ impl SimdVec<u64> for U64x4 {
 
     fn splat(value: u64) -> Self {
         Self {
-            elements: unsafe { _mm256_set1_epi64x(value as i64) },
+            elements: unsafe { _mm512_set1_epi64(value as i64) },
             size: LANE_COUNT,
         }
     }
 
     unsafe fn load(ptr: *const u64, size: usize) -> Self {
-        let msg = format!("Size must be == {}", LANE_COUNT);
+        let msg = format!("Size must be == {LANE_COUNT}");
         assert!(size == LANE_COUNT, "{}", msg);
 
         Self {
-            elements: unsafe { _mm256_loadu_si256(ptr as *const __m256i) },
+            elements: unsafe { _mm512_loadu_si512(ptr as *const __m512i) },
             size,
         }
     }
 
     unsafe fn load_partial(ptr: *const u64, size: usize) -> Self {
-        let msg = format!("Size must be < {}", LANE_COUNT);
+        let msg = format!("Size must be < {LANE_COUNT}");
         assert!(size < LANE_COUNT, "{}", msg);
 
-        let elements = match size {
-            1 => unsafe { _mm256_set_epi64x(0, 0, 0, *ptr.add(0) as i64) },
-            2 => unsafe { _mm256_set_epi64x(0, 0, *ptr.add(1) as i64, *ptr.add(0) as i64) },
-            3 => unsafe {
-                _mm256_set_epi64x(
-                    0,
-                    *ptr.add(2) as i64,
-                    *ptr.add(1) as i64,
-                    *ptr.add(0) as i64,
-                )
-            },
-            _ => {
-                let msg = "WTF is happening here";
-                panic!("{}", msg);
-            }
-        };
+        let mask = (1 << size) - 1;
 
-        Self { elements, size }
+        Self {
+            elements: unsafe { _mm512_maskz_loadu_epi64(mask, ptr as *const i64) },
+            size,
+        }
     }
 
     fn store(&self) -> Vec<u64> {
-        let msg = format!("Size must be <= {}", LANE_COUNT);
+        let msg = format!("Size must be <= {LANE_COUNT}");
 
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
         let mut vec = vec![0u64; LANE_COUNT];
 
         unsafe {
-            _mm256_storeu_si256(vec.as_mut_ptr() as *mut __m256i, self.elements);
+            _mm512_storeu_si512(vec.as_mut_ptr() as *mut __m512i, self.elements);
         }
 
         vec
@@ -96,33 +84,27 @@ impl SimdVec<u64> for U64x4 {
     }
 
     unsafe fn store_at(&self, ptr: *mut u64) {
-        let msg = format!("Size must be == {}", LANE_COUNT);
+        let msg = format!("Size must be == {LANE_COUNT}");
 
         assert!(self.size == LANE_COUNT, "{}", msg);
 
         unsafe {
-            _mm256_storeu_si256(ptr as *mut __m256i, self.elements);
+            _mm512_storeu_si512(ptr as *mut __m512i, self.elements);
         }
     }
 
     unsafe fn store_at_partial(&self, ptr: *mut u64) {
-        let msg = format!("Size must be < {}", LANE_COUNT);
+        let msg = format!("Size must be < {LANE_COUNT}");
+
         assert!(self.size < LANE_COUNT, "{}", msg);
 
-        let mask = match self.size {
-            1 => _mm256_setr_epi64x(-1, 0, 0, 0),
-            2 => _mm256_setr_epi64x(-1, -1, 0, 0),
-            3 => _mm256_setr_epi64x(-1, -1, -1, 0),
-            _ => panic!("Invalid size"),
-        };
+        let mask = (1 << self.size) - 1;
 
-        unsafe {
-            _mm256_maskstore_epi64(ptr as *mut i64, mask, self.elements);
-        }
+        _mm512_mask_storeu_epi64(ptr as *mut i64, mask, self.elements);
     }
 
     fn to_vec(self) -> Vec<u64> {
-        let msg = format!("Size must be <= {}", LANE_COUNT);
+        let msg = format!("Size must be <= {LANE_COUNT}");
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
         if self.size == LANE_COUNT {
@@ -142,7 +124,9 @@ impl SimdVec<u64> for U64x4 {
         );
 
         // Compare a == b elementwise
-        let elements = unsafe { _mm256_cmpeq_epi64(self.elements, rhs.elements) };
+        let mask = unsafe { _mm512_cmpeq_epi64_mask(self.elements, rhs.elements) };
+        let elements = unsafe { _mm512_movm_epi64(mask) };
+
         Self {
             elements,
             size: self.size,
@@ -159,7 +143,8 @@ impl SimdVec<u64> for U64x4 {
         );
 
         // Compare a<b elementwise
-        let elements = unsafe { _mm256_cmpgt_epi64(rhs.elements, self.elements) };
+        let mask = unsafe { _mm512_cmpgt_epi64_mask(rhs.elements, self.elements) };
+        let elements = unsafe { _mm512_movm_epi64(mask) };
 
         Self {
             elements,
@@ -177,9 +162,9 @@ impl SimdVec<u64> for U64x4 {
         );
 
         // Compare a<=b elementwise
-        let less_than = unsafe { _mm256_cmpgt_epi64(rhs.elements, self.elements) };
-        let equal = unsafe { _mm256_cmpeq_epi64(self.elements, rhs.elements) };
-        let elements = unsafe { _mm256_or_si256(less_than, equal) };
+        let mask = unsafe { _mm512_cmple_epi64_mask(self.elements, rhs.elements) };
+
+        let elements = unsafe { _mm512_movm_epi64(mask) };
 
         Self {
             elements,
@@ -197,7 +182,9 @@ impl SimdVec<u64> for U64x4 {
         );
 
         // Compare a>b elementwise
-        let elements = unsafe { _mm256_cmpgt_epi64(self.elements, rhs.elements) }; // Result as float mask
+        let mask = unsafe { _mm512_cmpgt_epi64_mask(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { _mm512_movm_epi64(mask) };
 
         Self {
             elements,
@@ -215,10 +202,9 @@ impl SimdVec<u64> for U64x4 {
         );
 
         // Compare a>=b elementwise
-        let greater_than = unsafe { _mm256_cmpgt_epi64(self.elements, rhs.elements) };
-        let equal = unsafe { _mm256_cmpeq_epi64(self.elements, rhs.elements) };
-        let elements = unsafe { _mm256_or_si256(greater_than, equal) };
+        let mask = unsafe { _mm512_cmpge_epi64_mask(self.elements, rhs.elements) }; // Result as float mask
 
+        let elements = unsafe { _mm512_movm_epi64(mask) };
         Self {
             elements,
             size: self.size,
@@ -226,7 +212,7 @@ impl SimdVec<u64> for U64x4 {
     }
 }
 
-impl Add for U64x4 {
+impl Add for U64x8 {
     type Output = Self;
 
     #[inline]
@@ -240,15 +226,15 @@ impl Add for U64x4 {
         );
 
         unsafe {
-            U64x4 {
+            U64x8 {
                 size: self.size,
-                elements: _mm256_add_epi64(self.elements, rhs.elements),
+                elements: _mm512_add_epi64(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl AddAssign for U64x4 {
+impl AddAssign for U64x8 {
     #[inline]
     fn add_assign(&mut self, rhs: Self) {
         assert!(
@@ -263,7 +249,7 @@ impl AddAssign for U64x4 {
     }
 }
 
-impl Sub for U64x4 {
+impl Sub for U64x8 {
     type Output = Self;
 
     #[inline]
@@ -277,15 +263,15 @@ impl Sub for U64x4 {
         );
 
         unsafe {
-            U64x4 {
+            U64x8 {
                 size: self.size,
-                elements: _mm256_sub_epi64(self.elements, rhs.elements),
+                elements: _mm512_sub_epi64(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl SubAssign for U64x4 {
+impl SubAssign for U64x8 {
     #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         assert!(
@@ -300,7 +286,7 @@ impl SubAssign for U64x4 {
     }
 }
 
-impl Mul for U64x4 {
+impl Mul for U64x8 {
     type Output = Self;
 
     #[inline]
@@ -313,29 +299,28 @@ impl Mul for U64x4 {
             rhs.size
         );
 
-        let lo_lo = unsafe { _mm256_mul_epu32(self.elements, rhs.elements) }; // Calculates al*bl
+        let low_low = unsafe { _mm512_mul_epu32(self.elements, rhs.elements) }; // a_lo * b_lo
 
-        let self_swap = unsafe { _mm256_shuffle_epi32(self.elements, 0xB1) };
-        let rhs_swap = unsafe { _mm256_shuffle_epi32(rhs.elements, 0xB1) };
+        let self_hi = unsafe { _mm512_srli_epi64(self.elements, 32) };
+        let rhs_hi = unsafe { _mm512_srli_epi64(rhs.elements, 32) };
 
-        let selfh_rhsl = unsafe { _mm256_mul_epu32(self_swap, rhs.elements) };
+        let high_low = unsafe { _mm512_mul_epu32(self_hi, rhs.elements) };
 
-        let selfl_rhsh = unsafe { _mm256_mul_epu32(self.elements, rhs_swap) };
+        let low_high = unsafe { _mm512_mul_epu32(self.elements, rhs_hi) };
 
-        let cross_sum = unsafe { _mm256_add_epi64(selfh_rhsl, selfl_rhsh) };
+        let cross_terms = unsafe { _mm512_add_epi64(high_low, low_high) };
+        let cross_shifted = unsafe { _mm512_slli_epi64(cross_terms, 32) };
 
-        let cross_sum_shifted = unsafe { _mm256_slli_epi64(cross_sum, 32) };
+        let elements = unsafe { _mm512_add_epi64(low_low, cross_shifted) };
 
-        let elements = unsafe { _mm256_add_epi64(lo_lo, cross_sum_shifted) };
-
-        U64x4 {
+        U64x8 {
             size: self.size,
             elements,
         }
     }
 }
 
-impl MulAssign for U64x4 {
+impl MulAssign for U64x8 {
     #[inline]
     fn mul_assign(&mut self, rhs: Self) {
         assert!(
@@ -349,9 +334,9 @@ impl MulAssign for U64x4 {
     }
 }
 
-impl Eq for U64x4 {}
+impl Eq for U64x8 {}
 
-impl PartialEq for U64x4 {
+impl PartialEq for U64x8 {
     fn eq(&self, other: &Self) -> bool {
         assert!(
             self.size == other.size,
@@ -363,10 +348,7 @@ impl PartialEq for U64x4 {
 
         unsafe {
             // Compare lane-by-lane
-            let cmp = _mm256_cmpeq_epi64(self.elements, other.elements);
-
-            // Move the mask to integer form
-            let mask = _mm256_movemask_epi8(cmp);
+            let mask = _mm512_cmpeq_epi64_mask(self.elements, other.elements);
 
             // All 4 lanes equal => mask == 0b1111 == 0xF
             mask == 0xF
@@ -374,7 +356,7 @@ impl PartialEq for U64x4 {
     }
 }
 
-impl PartialOrd for U64x4 {
+impl PartialOrd for U64x8 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         assert!(
             self.size == other.size,
@@ -389,9 +371,9 @@ impl PartialOrd for U64x4 {
             let gt = self.gt_elements(*other).elements;
             let eq = self.eq_elements(*other).elements;
 
-            let lt_mask = _mm256_movemask_epi8(lt);
-            let gt_mask = _mm256_movemask_epi8(gt);
-            let eq_mask = _mm256_movemask_epi8(eq);
+            let lt_mask = _mm512_reduce_and_epi64(lt);
+            let gt_mask = _mm512_reduce_and_epi64(gt);
+            let eq_mask = _mm512_reduce_and_epi64(eq);
 
             match (lt_mask, gt_mask, eq_mask) {
                 (0xF, 0x0, _) => Some(std::cmp::Ordering::Less), // all lanes less
@@ -437,7 +419,7 @@ impl PartialOrd for U64x4 {
     }
 }
 
-impl BitAnd for U64x4 {
+impl BitAnd for U64x8 {
     type Output = Self;
 
     #[inline]
@@ -451,15 +433,15 @@ impl BitAnd for U64x4 {
         );
 
         unsafe {
-            U64x4 {
+            U64x8 {
                 size: self.size,
-                elements: _mm256_and_si256(self.elements, rhs.elements),
+                elements: _mm512_and_si512(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl BitAndAssign for U64x4 {
+impl BitAndAssign for U64x8 {
     #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
         assert!(
@@ -474,7 +456,7 @@ impl BitAndAssign for U64x4 {
     }
 }
 
-impl BitOr for U64x4 {
+impl BitOr for U64x8 {
     type Output = Self;
 
     #[inline]
@@ -488,15 +470,15 @@ impl BitOr for U64x4 {
         );
 
         unsafe {
-            U64x4 {
+            U64x8 {
                 size: self.size,
-                elements: _mm256_or_si256(self.elements, rhs.elements),
+                elements: _mm512_or_si512(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl BitOrAssign for U64x4 {
+impl BitOrAssign for U64x8 {
     #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
         assert!(
@@ -512,14 +494,14 @@ impl BitOrAssign for U64x4 {
 }
 
 #[cfg(test)]
-mod u64x4_tests {
+mod i64x8_tests {
     use std::{cmp::min, vec};
 
     use super::*;
 
     #[test]
-    /// __m256i fields are private and cannot be compared directly
-    /// test consist on loading elements to __m256i then fetching them using .to_vec method
+    /// __m512i fields are private and cannot be compared directly
+    /// test consist on loading elements to __m512i then fetching them using .to_vec method
     /// implicitly tests load, load_partial, store, store_partial and to_vec methods
     fn test_new() {
         let n = 20;
@@ -527,7 +509,7 @@ mod u64x4_tests {
         (1..=n).for_each(|i| {
             let a1: Vec<u64> = (1..=i).collect();
 
-            let v1 = U64x4::new(&a1);
+            let v1 = U64x8::new(&a1);
 
             let truncated_a1 = a1
                 .as_slice()
@@ -544,9 +526,9 @@ mod u64x4_tests {
     /// Splat method should duplicate one value for all elements of __m256
     #[test]
     fn test_splat() {
-        let a = vec![1; 4];
+        let a = vec![1; 8];
 
-        let v = U64x4::splat(1);
+        let v = U64x8::splat(1);
 
         assert_eq!(a, v.to_vec())
     }
@@ -556,27 +538,24 @@ mod u64x4_tests {
         let mut a1: Vec<u64> = vec![100; 20];
 
         let s1: Vec<u64> = (1..=8).collect();
-        let v1 = U64x4::new(&s1);
+        let v1 = U64x8::new(&s1);
 
         unsafe { v1.store_at(a1[0..].as_mut_ptr()) };
 
         assert_eq!(
-            &[
-                1, 2, 3, 4, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
-                100, 100
-            ],
+            &[1, 2, 3, 4, 5, 6, 7, 8, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100],
             a1.as_slice()
         );
 
         let mut a2: Vec<u64> = vec![1; 20];
 
         let s2: Vec<u64> = (1..=16).collect();
-        let v2 = U64x4::new(&s2);
+        let v2 = U64x8::new(&s2);
 
         unsafe { v2.store_at(a2[4..].as_mut_ptr()) };
 
         assert_eq!(
-            &[1, 1, 1, 1, 1, 2, 3, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            &[1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 1, 1, 1, 1, 1, 1, 1],
             a2.as_slice()
         );
     }
@@ -590,7 +569,7 @@ mod u64x4_tests {
 
             let a: Vec<u64> = (1..=i).collect();
 
-            let v = U64x4::new(a.as_slice());
+            let v = U64x8::new(a.as_slice());
 
             unsafe {
                 v.store_at_partial(vector[4..].as_mut_ptr());
@@ -609,7 +588,7 @@ mod u64x4_tests {
 
         let a: Vec<u64> = (1..=1).collect();
 
-        let v = U64x4::new(a.as_slice());
+        let v = U64x8::new(a.as_slice());
 
         unsafe {
             v.store_at_partial(vector[2..].as_mut_ptr());
@@ -620,21 +599,21 @@ mod u64x4_tests {
 
     #[test]
     fn test_add() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(vec![6], (u1 + v1).to_vec());
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(vec![6, 21], (u2 + v2).to_vec());
     }
 
     #[test]
     fn test_add_assign() {
-        let mut a = U64x4::new(&[1, 2, 3, 4]);
-        let b = U64x4::new(&[4, 3, 2, 1]);
+        let mut a = U64x8::new(&[1, 2, 3, 4]);
+        let b = U64x8::new(&[4, 3, 2, 1]);
 
         a += b;
 
@@ -644,21 +623,21 @@ mod u64x4_tests {
     #[allow(clippy::identity_op)]
     #[test]
     fn test_sub() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(vec![5 - 1], (u1 - v1).to_vec());
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(vec![5 - 1, 11 - 10], (u2 - v2).to_vec());
     }
 
     #[test]
     fn test_sub_assign() {
-        let mut a = U64x4::new(&[7, 4, 3, 4]);
-        let b = U64x4::new(&[4, 3, 2, 1]);
+        let mut a = U64x8::new(&[7, 4, 3, 4]);
+        let b = U64x8::new(&[4, 3, 2, 1]);
 
         a -= b;
 
@@ -669,21 +648,21 @@ mod u64x4_tests {
     #[allow(clippy::erasing_op)]
     #[test]
     fn test_mul() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(vec![5 * 1], (u1 * v1).to_vec());
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(vec![5 * 1, 11 * 10], (u2 * v2).to_vec());
     }
 
     #[test]
     fn test_mul_assign() {
-        let mut a = U64x4::new(&[1, 2, 3, 4]);
-        let b = U64x4::new(&[4, 3, 2, 1]);
+        let mut a = U64x8::new(&[1, 2, 3, 4]);
+        let b = U64x8::new(&[4, 3, 2, 1]);
 
         a *= b;
 
@@ -692,8 +671,8 @@ mod u64x4_tests {
 
     #[test]
     fn test_lt_elementwise() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5 < 1],
@@ -704,8 +683,8 @@ mod u64x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5 < 1, 11 < 10],
@@ -719,8 +698,8 @@ mod u64x4_tests {
 
     #[test]
     fn test_le_elementwise() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5 <= 1],
@@ -731,8 +710,8 @@ mod u64x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5 <= 1, 11 <= 10],
@@ -746,8 +725,8 @@ mod u64x4_tests {
 
     #[test]
     fn test_gt_elementwise() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5 > 1],
@@ -758,8 +737,8 @@ mod u64x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5 > 1, 11 > 10],
@@ -773,8 +752,8 @@ mod u64x4_tests {
 
     #[test]
     fn test_ge_elementwise() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5 >= 1],
@@ -785,8 +764,8 @@ mod u64x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5 >= 1, 11 >= 10],
@@ -800,8 +779,8 @@ mod u64x4_tests {
 
     #[test]
     fn test_eq_elementwise() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5 == 1],
@@ -812,8 +791,8 @@ mod u64x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5 == 1, 11 == 10],
@@ -827,65 +806,65 @@ mod u64x4_tests {
 
     #[test]
     fn test_eq() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!([5 == 1].iter().all(|f| *f), u1 == v1);
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!([5 == 1, 11 == 10].iter().all(|f| *f), u2 == v2);
     }
 
     #[test]
     fn test_lt() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!([5 < 1].iter().all(|f| *f), u1 < v1);
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!([5 < 1, 11 < 10].iter().all(|f| *f), u2 < v2);
     }
 
     #[test]
     fn test_le() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!([5 <= 1].iter().all(|f| *f), u1 <= v1);
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!([5 <= 1, 11 <= 10].iter().all(|f| *f), u2 <= v2);
     }
 
     #[test]
     fn test_gt() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!([5 > 1].iter().all(|f| *f), u1 > v1);
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!([5 > 1, 11 > 10].iter().all(|f| *f), u2 > v2);
     }
 
     #[test]
     fn test_ge() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!([5 >= 1].iter().all(|f| *f), u1 >= v1);
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!([5 >= 1, 11 >= 10].iter().all(|f| *f), u2 >= v2);
     }
@@ -894,8 +873,8 @@ mod u64x4_tests {
     #[allow(clippy::bad_bit_mask)]
     #[test]
     fn test_and() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5u8 & 1u8 != 0],
@@ -906,8 +885,8 @@ mod u64x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5u8 & 1u8 != 0, 11u8 & 10u8 != 0],
@@ -922,8 +901,8 @@ mod u64x4_tests {
     #[allow(clippy::bad_bit_mask)]
     #[test]
     fn test_or() {
-        let v1 = U64x4::new(&[1]);
-        let u1 = U64x4::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5u8 | 1u8 != 0],
@@ -934,8 +913,8 @@ mod u64x4_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = U64x4::new(&[1, 10]);
-        let u2 = U64x4::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5u8 | 1u8 != 0, 11u8 | 10u8 != 0],
