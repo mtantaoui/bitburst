@@ -9,17 +9,17 @@ use std::ops::{
 
 use crate::simd::vec::SimdVec;
 
-pub const LANE_COUNT: usize = 16;
+pub const LANE_COUNT: usize = 8;
 
 /// A SIMD vector of 4 32-bit floating point values
 #[derive(Copy, Clone, Debug)]
-pub struct I32x16 {
+pub struct U64x8 {
     size: usize,
     elements: __m512i,
 }
 
-impl SimdVec<i32> for I32x16 {
-    fn new(slice: &[i32]) -> Self {
+impl SimdVec<u64> for U64x8 {
+    fn new(slice: &[u64]) -> Self {
         assert!(!slice.is_empty(), "Size can't be zero");
 
         match slice.len().cmp(&LANE_COUNT) {
@@ -30,14 +30,14 @@ impl SimdVec<i32> for I32x16 {
         }
     }
 
-    fn splat(value: i32) -> Self {
+    fn splat(value: u64) -> Self {
         Self {
-            elements: unsafe { _mm512_set1_epi32(value) },
+            elements: unsafe { _mm512_set1_epi64(value as i64) },
             size: LANE_COUNT,
         }
     }
 
-    unsafe fn load(ptr: *const i32, size: usize) -> Self {
+    unsafe fn load(ptr: *const u64, size: usize) -> Self {
         let msg = format!("Size must be == {LANE_COUNT}");
         assert!(size == LANE_COUNT, "{}", msg);
 
@@ -47,24 +47,24 @@ impl SimdVec<i32> for I32x16 {
         }
     }
 
-    unsafe fn load_partial(ptr: *const i32, size: usize) -> Self {
+    unsafe fn load_partial(ptr: *const u64, size: usize) -> Self {
         let msg = format!("Size must be < {LANE_COUNT}");
         assert!(size < LANE_COUNT, "{}", msg);
 
         let mask = (1 << size) - 1;
 
         Self {
-            elements: unsafe { _mm512_maskz_loadu_epi32(mask, ptr) },
+            elements: unsafe { _mm512_maskz_loadu_epi64(mask, ptr as *const i64) },
             size,
         }
     }
 
-    fn store(&self) -> Vec<i32> {
+    fn store(&self) -> Vec<u64> {
         let msg = format!("Size must be <= {LANE_COUNT}");
 
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
-        let mut vec = vec![0i32; LANE_COUNT];
+        let mut vec = vec![0u64; LANE_COUNT];
 
         unsafe {
             _mm512_storeu_si512(vec.as_mut_ptr() as *mut __m512i, self.elements);
@@ -73,7 +73,7 @@ impl SimdVec<i32> for I32x16 {
         vec
     }
 
-    fn store_partial(&self) -> Vec<i32> {
+    fn store_partial(&self) -> Vec<u64> {
         match self.size {
             1..LANE_COUNT => self.store().into_iter().take(self.size).collect(),
             _ => {
@@ -83,7 +83,7 @@ impl SimdVec<i32> for I32x16 {
         }
     }
 
-    unsafe fn store_at(&self, ptr: *mut i32) {
+    unsafe fn store_at(&self, ptr: *mut u64) {
         let msg = format!("Size must be == {LANE_COUNT}");
 
         assert!(self.size == LANE_COUNT, "{}", msg);
@@ -93,17 +93,17 @@ impl SimdVec<i32> for I32x16 {
         }
     }
 
-    unsafe fn store_at_partial(&self, ptr: *mut i32) {
+    unsafe fn store_at_partial(&self, ptr: *mut u64) {
         let msg = format!("Size must be < {LANE_COUNT}");
 
         assert!(self.size < LANE_COUNT, "{}", msg);
 
         let mask = (1 << self.size) - 1;
 
-        _mm512_mask_storeu_epi32(ptr, mask, self.elements);
+        _mm512_mask_storeu_epi64(ptr as *mut i64, mask, self.elements);
     }
 
-    fn to_vec(self) -> Vec<i32> {
+    fn to_vec(self) -> Vec<u64> {
         let msg = format!("Size must be <= {LANE_COUNT}");
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
@@ -124,8 +124,8 @@ impl SimdVec<i32> for I32x16 {
         );
 
         // Compare a == b elementwise
-        let mask = unsafe { _mm512_cmpeq_epi32_mask(self.elements, rhs.elements) };
-        let elements = unsafe { _mm512_movm_epi32(mask) };
+        let mask = unsafe { _mm512_cmpeq_epi64_mask(self.elements, rhs.elements) };
+        let elements = unsafe { _mm512_movm_epi64(mask) };
 
         Self {
             elements,
@@ -143,8 +143,8 @@ impl SimdVec<i32> for I32x16 {
         );
 
         // Compare a<b elementwise
-        let mask = unsafe { _mm512_cmplt_epi32_mask(self.elements, rhs.elements) };
-        let elements = unsafe { _mm512_movm_epi32(mask) };
+        let mask = unsafe { _mm512_cmpgt_epi64_mask(rhs.elements, self.elements) };
+        let elements = unsafe { _mm512_movm_epi64(mask) };
 
         Self {
             elements,
@@ -162,8 +162,9 @@ impl SimdVec<i32> for I32x16 {
         );
 
         // Compare a<=b elementwise
-        let mask = unsafe { _mm512_cmple_epi32_mask(self.elements, rhs.elements) };
-        let elements = unsafe { _mm512_movm_epi32(mask) };
+        let mask = unsafe { _mm512_cmple_epi64_mask(self.elements, rhs.elements) };
+
+        let elements = unsafe { _mm512_movm_epi64(mask) };
 
         Self {
             elements,
@@ -181,8 +182,9 @@ impl SimdVec<i32> for I32x16 {
         );
 
         // Compare a>b elementwise
-        let mask = unsafe { _mm512_cmpgt_epi32_mask(self.elements, rhs.elements) };
-        let elements = unsafe { _mm512_movm_epi32(mask) };
+        let mask = unsafe { _mm512_cmpgt_epi64_mask(self.elements, rhs.elements) }; // Result as float mask
+
+        let elements = unsafe { _mm512_movm_epi64(mask) };
 
         Self {
             elements,
@@ -200,9 +202,9 @@ impl SimdVec<i32> for I32x16 {
         );
 
         // Compare a>=b elementwise
-        let mask = unsafe { _mm512_cmpge_epi32_mask(self.elements, rhs.elements) };
-        let elements = unsafe { _mm512_movm_epi32(mask) };
+        let mask = unsafe { _mm512_cmpge_epi64_mask(self.elements, rhs.elements) }; // Result as float mask
 
+        let elements = unsafe { _mm512_movm_epi64(mask) };
         Self {
             elements,
             size: self.size,
@@ -210,7 +212,7 @@ impl SimdVec<i32> for I32x16 {
     }
 }
 
-impl Add for I32x16 {
+impl Add for U64x8 {
     type Output = Self;
 
     #[inline]
@@ -224,15 +226,15 @@ impl Add for I32x16 {
         );
 
         unsafe {
-            I32x16 {
+            U64x8 {
                 size: self.size,
-                elements: _mm512_add_epi32(self.elements, rhs.elements),
+                elements: _mm512_add_epi64(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl AddAssign for I32x16 {
+impl AddAssign for U64x8 {
     #[inline]
     fn add_assign(&mut self, rhs: Self) {
         assert!(
@@ -247,7 +249,7 @@ impl AddAssign for I32x16 {
     }
 }
 
-impl Sub for I32x16 {
+impl Sub for U64x8 {
     type Output = Self;
 
     #[inline]
@@ -261,15 +263,15 @@ impl Sub for I32x16 {
         );
 
         unsafe {
-            I32x16 {
+            U64x8 {
                 size: self.size,
-                elements: _mm512_sub_epi32(self.elements, rhs.elements),
+                elements: _mm512_sub_epi64(self.elements, rhs.elements),
             }
         }
     }
 }
 
-impl SubAssign for I32x16 {
+impl SubAssign for U64x8 {
     #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         assert!(
@@ -284,7 +286,7 @@ impl SubAssign for I32x16 {
     }
 }
 
-impl Mul for I32x16 {
+impl Mul for U64x8 {
     type Output = Self;
 
     #[inline]
@@ -297,17 +299,28 @@ impl Mul for I32x16 {
             rhs.size
         );
 
-        // Pack 16-bit products into 8-bit integers with saturation
-        let elements = unsafe { _mm512_mullo_epi32(self.elements, rhs.elements) };
+        let low_low = unsafe { _mm512_mul_epu32(self.elements, rhs.elements) }; // a_lo * b_lo
 
-        I32x16 {
+        let self_hi = unsafe { _mm512_srli_epi64(self.elements, 32) };
+        let rhs_hi = unsafe { _mm512_srli_epi64(rhs.elements, 32) };
+
+        let high_low = unsafe { _mm512_mul_epu32(self_hi, rhs.elements) };
+
+        let low_high = unsafe { _mm512_mul_epu32(self.elements, rhs_hi) };
+
+        let cross_terms = unsafe { _mm512_add_epi64(high_low, low_high) };
+        let cross_shifted = unsafe { _mm512_slli_epi64(cross_terms, 32) };
+
+        let elements = unsafe { _mm512_add_epi64(low_low, cross_shifted) };
+
+        U64x8 {
             size: self.size,
             elements,
         }
     }
 }
 
-impl MulAssign for I32x16 {
+impl MulAssign for U64x8 {
     #[inline]
     fn mul_assign(&mut self, rhs: Self) {
         assert!(
@@ -321,9 +334,9 @@ impl MulAssign for I32x16 {
     }
 }
 
-impl Eq for I32x16 {}
+impl Eq for U64x8 {}
 
-impl PartialEq for I32x16 {
+impl PartialEq for U64x8 {
     fn eq(&self, other: &Self) -> bool {
         assert!(
             self.size == other.size,
@@ -335,7 +348,7 @@ impl PartialEq for I32x16 {
 
         unsafe {
             // Compare lane-by-lane
-            let mask = _mm512_cmpeq_epi32_mask(self.elements, other.elements);
+            let mask = _mm512_cmpeq_epi64_mask(self.elements, other.elements);
 
             // All 4 lanes equal => mask == 0b1111 == 0xF
             mask == 0xF
@@ -343,7 +356,7 @@ impl PartialEq for I32x16 {
     }
 }
 
-impl PartialOrd for I32x16 {
+impl PartialOrd for U64x8 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         assert!(
             self.size == other.size,
@@ -377,7 +390,7 @@ impl PartialOrd for I32x16 {
             .lt_elements(*other)
             .to_vec()
             .iter()
-            // converting i32 to bool
+            // converting u64 to bool
             .all(|&f| f != 0)
     }
 
@@ -385,7 +398,7 @@ impl PartialOrd for I32x16 {
         self.le_elements(*other)
             .to_vec()
             .iter()
-            // converting i32 to bool
+            // converting u64 to bool
             .all(|&f| f != 0)
     }
 
@@ -393,7 +406,7 @@ impl PartialOrd for I32x16 {
         self.gt_elements(*other)
             .to_vec()
             .iter()
-            // converting i32 to bool
+            // converting u64 to bool
             .all(|&f| f != 0)
     }
 
@@ -401,12 +414,12 @@ impl PartialOrd for I32x16 {
         self.ge_elements(*other)
             .to_vec()
             .iter()
-            // converting i32 to bool
+            // converting u64 to bool
             .all(|&f| f != 0)
     }
 }
 
-impl BitAnd for I32x16 {
+impl BitAnd for U64x8 {
     type Output = Self;
 
     #[inline]
@@ -420,7 +433,7 @@ impl BitAnd for I32x16 {
         );
 
         unsafe {
-            I32x16 {
+            U64x8 {
                 size: self.size,
                 elements: _mm512_and_si512(self.elements, rhs.elements),
             }
@@ -428,7 +441,7 @@ impl BitAnd for I32x16 {
     }
 }
 
-impl BitAndAssign for I32x16 {
+impl BitAndAssign for U64x8 {
     #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
         assert!(
@@ -443,7 +456,7 @@ impl BitAndAssign for I32x16 {
     }
 }
 
-impl BitOr for I32x16 {
+impl BitOr for U64x8 {
     type Output = Self;
 
     #[inline]
@@ -457,7 +470,7 @@ impl BitOr for I32x16 {
         );
 
         unsafe {
-            I32x16 {
+            U64x8 {
                 size: self.size,
                 elements: _mm512_or_si512(self.elements, rhs.elements),
             }
@@ -465,7 +478,7 @@ impl BitOr for I32x16 {
     }
 }
 
-impl BitOrAssign for I32x16 {
+impl BitOrAssign for U64x8 {
     #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
         assert!(
@@ -481,7 +494,7 @@ impl BitOrAssign for I32x16 {
 }
 
 #[cfg(test)]
-mod i32x16_tests {
+mod i64x8_tests {
     use std::{cmp::min, vec};
 
     use super::*;
@@ -494,16 +507,16 @@ mod i32x16_tests {
         let n = 20;
 
         (1..=n).for_each(|i| {
-            let a1: Vec<i32> = (1..=i).collect();
+            let a1: Vec<u64> = (1..=i).collect();
 
-            let v1 = I32x16::new(&a1);
+            let v1 = U64x8::new(&a1);
 
             let truncated_a1 = a1
                 .as_slice()
                 .iter()
                 .take(v1.size)
                 .copied()
-                .collect::<Vec<i32>>();
+                .collect::<Vec<u64>>();
 
             assert_eq!(truncated_a1, v1.to_vec());
             assert_eq!(min(truncated_a1.len(), LANE_COUNT), v1.size);
@@ -513,50 +526,50 @@ mod i32x16_tests {
     /// Splat method should duplicate one value for all elements of __m256
     #[test]
     fn test_splat() {
-        let a = vec![1; 16];
+        let a = vec![1; 8];
 
-        let v = I32x16::splat(1);
+        let v = U64x8::splat(1);
 
         assert_eq!(a, v.to_vec())
     }
 
     #[test]
     fn test_store_at() {
-        let mut a1: Vec<i32> = vec![100; 20];
+        let mut a1: Vec<u64> = vec![100; 20];
 
-        let s1: Vec<i32> = (1..=16).collect();
-        let v1 = I32x16::new(&s1);
+        let s1: Vec<u64> = (1..=8).collect();
+        let v1 = U64x8::new(&s1);
 
         unsafe { v1.store_at(a1[0..].as_mut_ptr()) };
 
         assert_eq!(
-            &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 100, 100, 100, 100],
+            &[1, 2, 3, 4, 5, 6, 7, 8, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100],
             a1.as_slice()
         );
 
-        let mut a2: Vec<i32> = vec![-1; 20];
+        let mut a2: Vec<u64> = vec![1; 20];
 
-        let s2: Vec<i32> = (1..=16).collect();
-        let v2 = I32x16::new(&s2);
+        let s2: Vec<u64> = (1..=16).collect();
+        let v2 = U64x8::new(&s2);
 
         unsafe { v2.store_at(a2[4..].as_mut_ptr()) };
 
         assert_eq!(
-            &[-1, -1, -1, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+            &[1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 1, 1, 1, 1, 1, 1, 1],
             a2.as_slice()
         );
     }
 
     #[test]
     fn test_store_at_partial() {
-        let n = 3;
+        let n = 1;
 
         (1..=n).for_each(|i| {
-            let mut vector: Vec<i32> = vec![100; 11];
+            let mut vector: Vec<u64> = vec![100; 11];
 
-            let a: Vec<i32> = (1..=i).collect();
+            let a: Vec<u64> = (1..=i).collect();
 
-            let v = I32x16::new(a.as_slice());
+            let v = U64x8::new(a.as_slice());
 
             unsafe {
                 v.store_at_partial(vector[4..].as_mut_ptr());
@@ -564,8 +577,6 @@ mod i32x16_tests {
 
             let test = match i {
                 1 => &[100, 100, 100, 100, 1, 100, 100, 100, 100, 100, 100],
-                2 => &[100, 100, 100, 100, 1, 2, 100, 100, 100, 100, 100],
-                3 => &[100, 100, 100, 100, 1, 2, 3, 100, 100, 100, 100],
 
                 _ => panic!("Not a test case"),
             };
@@ -573,11 +584,11 @@ mod i32x16_tests {
             assert_eq!(test, vector.as_slice());
         });
 
-        let mut vector: Vec<i32> = vec![100; 3];
+        let mut vector: Vec<u64> = vec![100; 3];
 
-        let a: Vec<i32> = (1..=1).collect();
+        let a: Vec<u64> = (1..=1).collect();
 
-        let v = I32x16::new(a.as_slice());
+        let v = U64x8::new(a.as_slice());
 
         unsafe {
             v.store_at_partial(vector[2..].as_mut_ptr());
@@ -588,31 +599,21 @@ mod i32x16_tests {
 
     #[test]
     fn test_add() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(vec![6], (u1 + v1).to_vec());
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(vec![6, 21], (u2 + v2).to_vec());
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!(vec![6, 21, 16], (u3 + v3).to_vec());
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(vec![6, 21, 16, 7], (u4 + v4).to_vec());
     }
 
     #[test]
     fn test_add_assign() {
-        let mut a = I32x16::new(&[1, 2, 3, 4]);
-        let b = I32x16::new(&[4, 3, 2, 1]);
+        let mut a = U64x8::new(&[1, 2, 3, 4]);
+        let b = U64x8::new(&[4, 3, 2, 1]);
 
         a += b;
 
@@ -622,66 +623,46 @@ mod i32x16_tests {
     #[allow(clippy::identity_op)]
     #[test]
     fn test_sub() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(vec![5 - 1], (u1 - v1).to_vec());
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(vec![5 - 1, 11 - 10], (u2 - v2).to_vec());
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!(vec![5 - 1, 11 - 10, 9 - 7], (u3 - v3).to_vec());
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(vec![5 - 1, 11 - 10, 9 - 7, 5 - 2], (u4 - v4).to_vec());
     }
 
     #[test]
     fn test_sub_assign() {
-        let mut a = I32x16::new(&[1, 2, 3, 4]);
-        let b = I32x16::new(&[4, 3, 2, 1]);
+        let mut a = U64x8::new(&[7, 4, 3, 4]);
+        let b = U64x8::new(&[4, 3, 2, 1]);
 
         a -= b;
 
-        assert_eq!(vec![-3, -1, 1, 3], a.to_vec());
+        assert_eq!(vec![3, 1, 1, 3], a.to_vec());
     }
 
     #[allow(clippy::identity_op)]
     #[allow(clippy::erasing_op)]
     #[test]
     fn test_mul() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(vec![5 * 1], (u1 * v1).to_vec());
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(vec![5 * 1, 11 * 10], (u2 * v2).to_vec());
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!(vec![5 * 1, 11 * 10, 9 * 7], (u3 * v3).to_vec());
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(vec![5 * 1, 11 * 10, 9 * 7, 5 * 2], (u4 * v4).to_vec());
     }
 
     #[test]
     fn test_mul_assign() {
-        let mut a = I32x16::new(&[1, 2, 3, 4]);
-        let b = I32x16::new(&[4, 3, 2, 1]);
+        let mut a = U64x8::new(&[1, 2, 3, 4]);
+        let b = U64x8::new(&[4, 3, 2, 1]);
 
         a *= b;
 
@@ -690,8 +671,8 @@ mod i32x16_tests {
 
     #[test]
     fn test_lt_elementwise() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5 < 1],
@@ -702,8 +683,8 @@ mod i32x16_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5 < 1, 11 < 10],
@@ -713,43 +694,12 @@ mod i32x16_tests {
                 .map(|f| *f != 0)
                 .collect::<Vec<bool>>()
         );
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!(
-            vec![5 < 1, 11 < 10, 9 < 7],
-            (u3.lt_elements(v3))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(
-            vec![5 < 1, 11 < 10, 9 < 7, 5 < 2],
-            (u4.lt_elements(v4))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
     }
 
     #[test]
     fn test_le_elementwise() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
-
-        println!(
-            "{:?}",
-            (u1.le_elements(v1)).to_vec() // .iter()
-                                          // .map(|f| *f != 0)
-                                          // .collect::<Vec<bool>>()
-        );
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5 <= 1],
@@ -760,8 +710,8 @@ mod i32x16_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5 <= 1, 11 <= 10],
@@ -771,36 +721,12 @@ mod i32x16_tests {
                 .map(|f| *f != 0)
                 .collect::<Vec<bool>>()
         );
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!(
-            vec![5 <= 1, 11 <= 10, 9 <= 7],
-            (u3.le_elements(v3))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(
-            vec![5 <= 1, 11 <= 10, 9 <= 7, 5 <= 2],
-            (u4.le_elements(v4))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
     }
 
     #[test]
     fn test_gt_elementwise() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5 > 1],
@@ -811,8 +737,8 @@ mod i32x16_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5 > 1, 11 > 10],
@@ -822,36 +748,12 @@ mod i32x16_tests {
                 .map(|f| *f != 0)
                 .collect::<Vec<bool>>()
         );
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!(
-            vec![5 > 1, 11 > 10, 9 > 7],
-            (u3.gt_elements(v3))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(
-            vec![5 > 1, 11 > 10, 9 > 7, 5 > 2],
-            (u4.gt_elements(v4))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
     }
 
     #[test]
     fn test_ge_elementwise() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5 >= 1],
@@ -862,8 +764,8 @@ mod i32x16_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5 >= 1, 11 >= 10],
@@ -873,36 +775,12 @@ mod i32x16_tests {
                 .map(|f| *f != 0)
                 .collect::<Vec<bool>>()
         );
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!(
-            vec![5 >= 1, 11 >= 10, 9 >= 7],
-            (u3.ge_elements(v3))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(
-            vec![5 >= 1, 11 >= 10, 9 >= 7, 5 >= 2],
-            (u4.ge_elements(v4))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
     }
 
     #[test]
     fn test_eq_elementwise() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5 == 1],
@@ -913,8 +791,8 @@ mod i32x16_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5 == 1, 11 == 10],
@@ -924,162 +802,79 @@ mod i32x16_tests {
                 .map(|f| *f != 0)
                 .collect::<Vec<bool>>()
         );
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!(
-            vec![5 == 1, 11 == 10, 9 == 7],
-            (u3.eq_elements(v3))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(
-            vec![5 == 1, 11 == 10, 9 == 7, 5 == 2],
-            (u4.eq_elements(v4))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
     }
 
     #[test]
     fn test_eq() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!([5 == 1].iter().all(|f| *f), u1 == v1);
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!([5 == 1, 11 == 10].iter().all(|f| *f), u2 == v2);
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!([5 == 1, 11 == 10, 9 == 7].iter().all(|f| *f), u3 == v3);
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(
-            [5 == 1, 11 == 10, 9 == 7, 5 == 2].iter().all(|f| *f),
-            u4 == v4
-        );
     }
 
     #[test]
     fn test_lt() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!([5 < 1].iter().all(|f| *f), u1 < v1);
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!([5 < 1, 11 < 10].iter().all(|f| *f), u2 < v2);
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!([5 < 1, 11 < 10, 9 < 7].iter().all(|f| *f), u3 < v3);
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!([5 < 1, 11 < 10, 9 < 7, 5 < 2].iter().all(|f| *f), u4 < v4);
     }
 
     #[test]
     fn test_le() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!([5 <= 1].iter().all(|f| *f), u1 <= v1);
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!([5 <= 1, 11 <= 10].iter().all(|f| *f), u2 <= v2);
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!([5 <= 1, 11 <= 10, 9 <= 7].iter().all(|f| *f), u3 <= v3);
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(
-            [5 <= 1, 11 <= 10, 9 <= 7, 5 <= 2].iter().all(|f| *f),
-            u4 <= v4
-        );
     }
 
     #[test]
     fn test_gt() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!([5 > 1].iter().all(|f| *f), u1 > v1);
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!([5 > 1, 11 > 10].iter().all(|f| *f), u2 > v2);
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!([5 > 1, 11 > 10, 9 > 7].iter().all(|f| *f), u3 > v3);
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!([5 > 1, 11 > 10, 9 > 7, 5 > 2].iter().all(|f| *f), u4 > v4);
     }
 
     #[test]
     fn test_ge() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!([5 >= 1].iter().all(|f| *f), u1 >= v1);
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!([5 >= 1, 11 >= 10].iter().all(|f| *f), u2 >= v2);
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!([5 >= 1, 11 >= 10, 9 >= 7].iter().all(|f| *f), u3 >= v3);
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(
-            [5 >= 1, 11 >= 10, 9 >= 7, 5 >= 2].iter().all(|f| *f),
-            u4 >= v4
-        );
     }
 
     #[allow(clippy::erasing_op)]
     #[allow(clippy::bad_bit_mask)]
     #[test]
     fn test_and() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5u8 & 1u8 != 0],
@@ -1090,41 +885,12 @@ mod i32x16_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5u8 & 1u8 != 0, 11u8 & 10u8 != 0],
             (u2.bitand(v2))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!(
-            vec![5u8 & 1u8 != 0, 11u8 & 10u8 != 0, 9u8 & 7u8 != 0],
-            (u3.bitand(v3))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(
-            vec![
-                5u8 & 1u8 != 0,
-                11u8 & 10u8 != 0,
-                9u8 & 7u8 != 0,
-                5u8 & 2u8 != 0
-            ],
-            (u4.bitand(v4))
                 .to_vec()
                 .iter()
                 .map(|f| *f != 0)
@@ -1135,8 +901,8 @@ mod i32x16_tests {
     #[allow(clippy::bad_bit_mask)]
     #[test]
     fn test_or() {
-        let v1 = I32x16::new(&[1]);
-        let u1 = I32x16::new(&[5]);
+        let v1 = U64x8::new(&[1]);
+        let u1 = U64x8::new(&[5]);
 
         assert_eq!(
             vec![5u8 | 1u8 != 0],
@@ -1147,41 +913,12 @@ mod i32x16_tests {
                 .collect::<Vec<bool>>()
         );
 
-        let v2 = I32x16::new(&[1, 10]);
-        let u2 = I32x16::new(&[5, 11]);
+        let v2 = U64x8::new(&[1, 10]);
+        let u2 = U64x8::new(&[5, 11]);
 
         assert_eq!(
             vec![5u8 | 1u8 != 0, 11u8 | 10u8 != 0],
             (u2.bitor(v2))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
-
-        let v3 = I32x16::new(&[1, 10, 7]);
-        let u3 = I32x16::new(&[5, 11, 9]);
-
-        assert_eq!(
-            vec![5u8 | 1u8 != 0, 11u8 | 10u8 != 0, 9u8 | 7u8 != 0],
-            (u3.bitor(v3))
-                .to_vec()
-                .iter()
-                .map(|f| *f != 0)
-                .collect::<Vec<bool>>()
-        );
-
-        let v4 = I32x16::new(&[1, 10, 7, 2]);
-        let u4 = I32x16::new(&[5, 11, 9, 5]);
-
-        assert_eq!(
-            vec![
-                5u8 | 1u8 != 0,
-                11u8 | 10u8 != 0,
-                9u8 | 7u8 != 0,
-                5u8 | 2u8 != 0
-            ],
-            (u4.bitor(v4))
                 .to_vec()
                 .iter()
                 .map(|f| *f != 0)
