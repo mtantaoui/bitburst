@@ -12,6 +12,12 @@ use crate::simd::vec::SimdVec;
 
 pub const LANE_COUNT: usize = 16;
 
+#[inline(always)]
+fn is_aligned_64(ptr: *const f32) -> bool {
+    let ptr = ptr as usize;
+    ptr % 64 == 0
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct F32x16 {
     size: usize,
@@ -39,47 +45,55 @@ impl SimdVec<f32> for F32x16 {
         }
     }
 
-    #[inline(always)]
+    #[target_feature(enable = "avx512f")]
     unsafe fn load(ptr: *const f32, size: usize) -> Self {
         let msg = format!("Size must be == {LANE_COUNT}");
         assert!(size == LANE_COUNT, "{}", msg);
 
-        Self {
-            elements: unsafe { _mm512_loadu_ps(ptr) },
-            size,
-        }
+        let elements = if is_aligned_64(ptr) {
+            _mm512_load_ps(ptr)
+        } else {
+            _mm512_loadu_ps(ptr)
+        };
+
+        Self { elements, size }
     }
 
-    #[inline(always)]
+    #[target_feature(enable = "avx512f")]
     unsafe fn load_partial(ptr: *const f32, size: usize) -> Self {
         let msg = format!("Size must be < {LANE_COUNT}");
         assert!(size < LANE_COUNT, "{}", msg);
 
         let mask: __mmask16 = (1 << size) - 1;
 
-        Self {
-            elements: unsafe { _mm512_maskz_loadu_ps(mask, ptr) },
-            size,
-        }
+        let elements = if is_aligned_64(ptr) {
+            _mm512_maskz_load_ps(mask, ptr)
+        } else {
+            _mm512_maskz_loadu_ps(mask, ptr)
+        };
+
+        Self { elements, size }
     }
 
-    #[inline(always)]
-    fn store(&self) -> Vec<f32> {
+    #[target_feature(enable = "avx512f")]
+    unsafe fn store(&self) -> Vec<f32> {
         let msg = format!("Size must be <= {LANE_COUNT}");
 
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
         let mut vec = vec![0f32; LANE_COUNT];
 
-        unsafe {
-            _mm512_storeu_ps(vec.as_mut_ptr(), self.elements);
-        }
+        if is_aligned_64(vec.as_mut_ptr()) {
+            unsafe { _mm512_store_ps(vec.as_mut_ptr(), self.elements) }
+        } else {
+            unsafe { _mm512_storeu_ps(vec.as_mut_ptr(), self.elements) }
+        };
 
         vec
     }
 
-    #[inline(always)]
-    fn store_partial(&self) -> Vec<f32> {
+    #[target_feature(enable = "avx512f")]
+    unsafe fn store_partial(&self) -> Vec<f32> {
         match self.size {
             1..LANE_COUNT => self.store().into_iter().take(self.size).collect(),
             _ => {
@@ -89,18 +103,20 @@ impl SimdVec<f32> for F32x16 {
         }
     }
 
-    #[inline(always)]
+    #[target_feature(enable = "avx512f")]
     unsafe fn store_at(&self, ptr: *mut f32) {
         let msg = format!("Size must be <= {LANE_COUNT}");
 
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
-        unsafe {
-            _mm512_storeu_ps(ptr, self.elements);
-        }
+        if is_aligned_64(ptr) {
+            _mm512_store_ps(ptr, self.elements)
+        } else {
+            _mm512_storeu_ps(ptr, self.elements)
+        };
     }
 
-    #[inline(always)]
+    #[target_feature(enable = "avx512f")]
     unsafe fn store_at_partial(&self, ptr: *mut f32) {
         let msg = format!("Size must be < {LANE_COUNT}");
 
@@ -108,7 +124,11 @@ impl SimdVec<f32> for F32x16 {
 
         let mask: __mmask16 = (1 << self.size) - 1;
 
-        _mm512_mask_storeu_ps(ptr, mask, self.elements);
+        if is_aligned_64(ptr) {
+            _mm512_mask_store_ps(ptr, mask, self.elements)
+        } else {
+            _mm512_mask_storeu_ps(ptr, mask, self.elements)
+        };
     }
 
     #[inline(always)]
@@ -117,9 +137,9 @@ impl SimdVec<f32> for F32x16 {
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
         if self.size == LANE_COUNT {
-            self.store()
+            unsafe { self.store() }
         } else {
-            self.store_partial()
+            unsafe { self.store_partial() }
         }
     }
 
@@ -228,10 +248,26 @@ impl SimdVec<f32> for F32x16 {
     }
 }
 
+#[target_feature(enable = "avx512f")]
+pub(crate) fn add(lhs: F32x16, rhs: F32x16) -> F32x16 {
+    assert!(
+        lhs.size == rhs.size,
+        "Operands must have the same size (expected {} lanes, got {} and {})",
+        LANE_COUNT,
+        lhs.size,
+        rhs.size
+    );
+
+    F32x16 {
+        size: lhs.size,
+        elements: _mm512_add_ps(lhs.elements, rhs.elements),
+    }
+}
+
 impl Add for F32x16 {
     type Output = Self;
 
-    #[inline(always)]
+    // #[target_feature(enable = "avx512f")]
     fn add(self, rhs: Self) -> Self::Output {
         assert!(
             self.size == rhs.size,

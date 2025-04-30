@@ -1,61 +1,3 @@
-// use bitburst::simd::avx512::add::{add_slices, add_vecs};
-// use criterion::{black_box, criterion_group, criterion_main, Criterion};
-// use ndarray::Array1;
-
-// const SIZES: [usize; 6] = [100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000];
-
-// // Benchmark: ndarray vector addition
-// fn add_ndarray_f32_vectors(size: usize) {
-//     let vec1 = Array1::from(vec![1.0f32; size]);
-//     let vec2 = Array1::from(vec![2.0f32; size]);
-
-//     let result = &vec1 + &vec2;
-//     black_box(result);
-// }
-
-// // Benchmark: custom Vec<f32> vector addition
-// fn add_bitburst_f32_slices(size: usize) {
-//     let vec1 = vec![1.0f32; size];
-//     let vec2 = vec![2.0f32; size];
-
-//     let result: Vec<f32> = add_slices(vec1.as_slice(), vec2.as_slice());
-//     black_box(result);
-// }
-
-// // Benchmark: custom Vec<f32> vector addition
-// fn add_bitburst_f32_vectors(size: usize) {
-//     let vec1 = vec![1.0f32; size];
-//     let vec2 = vec![2.0f32; size];
-
-//     let result: Vec<f32> = add_vecs(vec1, vec2);
-//     black_box(result);
-// }
-
-// fn add_f32_benchmark(c: &mut Criterion) {
-//     for size in SIZES {
-//         let mut group = c.benchmark_group(format!("Vector Add Comparison {size}"));
-
-//         group.sample_size(200);
-
-//         group.bench_function(format!("bitburst vector add: {size}"), |b| {
-//             b.iter(|| add_bitburst_f32_slices(size))
-//         });
-
-//         group.bench_function(format!("bitburst slices add: {size}"), |b| {
-//             b.iter(|| add_bitburst_f32_vectors(size))
-//         });
-
-//         group.bench_function(format!("ndarray vector add: {size}"), |b| {
-//             b.iter(|| add_ndarray_f32_vectors(size))
-//         });
-
-//         group.finish();
-//     }
-// }
-
-// criterion_group!(benches, add_f32_benchmark);
-// criterion_main!(benches);
-
 use bitburst::simd::avx512::add::add_slices;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use ndarray::Array1;
@@ -88,6 +30,8 @@ fn bench_vector_addition(c: &mut Criterion) {
     // let mut c_arr = Array1::<f32>::zeros(VECTOR_LENGTH); // For ndarray result
 
     let mut group = c.benchmark_group("VectorAdditionComparison");
+
+    group.sample_size(300);
     group.throughput(Throughput::Elements(VECTOR_LENGTH as u64)); // Report ops/element
 
     // --- Benchmark Your Implementation with different block sizes ---
@@ -104,7 +48,9 @@ fn bench_vector_addition(c: &mut Criterion) {
                 bencher.iter(|| {
                     // Pass black_box to prevent optimization based on constant inputs
                     // Pass the specific block size `bs`
-                    add_slices(black_box(&a_vec), black_box(&b_vec), bs);
+                    unsafe {
+                        add_slices(black_box(&a_vec), black_box(&b_vec), bs);
+                    }
                     // We modify c_vec in place, so the work isn't optimized away.
                     // black_box(c_vec.as_mut_slice()); // Alternative if needed
                 });
