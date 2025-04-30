@@ -3,12 +3,13 @@ use super::f32x16::F32x16;
 use crate::simd::vec::SimdVec;
 
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::slice::ParallelSlice;
 use rayon::slice::ParallelSliceMut;
 
-#[cfg(all(avx512, rustc_channel = "nightly"))]
-pub fn add(a: &[f32], b: &[f32]) -> Vec<f32> {
-    use rayon::slice::ParallelSlice;
+const CACHE_BLOCK_SIZE: usize = 24_000;
 
+#[cfg(all(avx512, rustc_channel = "nightly"))]
+pub fn add_slices(a: &[f32], b: &[f32]) -> Vec<f32> {
     let msg = format!(
         "Operands must have the same size lhs size:{}, rhs:{}",
         a.len(),
@@ -16,16 +17,57 @@ pub fn add(a: &[f32], b: &[f32]) -> Vec<f32> {
     );
     assert!(a.len() == b.len(), "{}", msg);
 
+    // Allocate result vector inside the function, as it's part of the work
     let size = a.len();
+    let mut c = vec![0.0; size];
+
+    c.par_chunks_mut(CACHE_BLOCK_SIZE) // Use the parameter here
+        .zip(a.par_chunks(CACHE_BLOCK_SIZE))
+        .zip(b.par_chunks(CACHE_BLOCK_SIZE))
+        .for_each(|((c_block, a_block), b_block)| {
+            add_block(a_block, b_block, c_block);
+        });
+    c
+}
+
+#[cfg(all(avx512, rustc_channel = "nightly"))]
+pub fn add_vecs(a: Vec<f32>, b: Vec<f32>) -> Vec<f32> {
+    let msg = format!(
+        "Operands must have the same size lhs size:{}, rhs:{}",
+        a.len(),
+        b.len()
+    );
+    assert!(a.len() == b.len(), "{}", msg);
+
+    // Allocate result vector inside the function, as it's part of the work
+    let size = a.len();
+    let mut c = vec![0.0; size];
+
+    c.par_chunks_mut(CACHE_BLOCK_SIZE) // Use the parameter here
+        .zip(a.par_chunks(CACHE_BLOCK_SIZE))
+        .zip(b.par_chunks(CACHE_BLOCK_SIZE))
+        .for_each(|((c_block, a_block), b_block)| {
+            add_block(a_block, b_block, c_block);
+        });
+    c
+}
+
+#[cfg(all(avx512, rustc_channel = "nightly"))]
+#[inline(always)]
+pub fn add_block(a: &[f32], b: &[f32], c: &mut [f32]) {
+    let msg = format!(
+        "Operands must have the same size lhs size:{}, rhs:{}",
+        a.len(),
+        b.len()
+    );
+    assert!(a.len() == b.len() && c.len() == a.len(), "{}", msg);
 
     let chunk_size = f32x16::LANE_COUNT;
 
-    let mut c = vec![0.0; size];
-
-    a.par_chunks(chunk_size)
-        .zip_eq(b.par_chunks(chunk_size))
-        .zip_eq(c.par_chunks_mut(chunk_size))
-        .for_each(|((a, b), c)| {
+    c.chunks_mut(chunk_size)
+        .zip(a.chunks(chunk_size))
+        .zip(b.chunks(chunk_size))
+        .for_each(|((c, a), b)| {
             let a_chunk = F32x16::new(a);
             let b_chunk = F32x16::new(b);
 
@@ -39,25 +81,4 @@ pub fn add(a: &[f32], b: &[f32]) -> Vec<f32> {
                 std::cmp::Ordering::Greater => unreachable!(),
             }
         });
-
-    c
-}
-
-#[cfg(test)]
-mod f32_add_tests {
-
-    use ndarray::Array1;
-
-    #[test]
-    fn ndarray_test() {
-        // Define two 1D arrays (vectors)
-        let vec1 = Array1::from(vec![1.0f32; 1000]);
-        let vec2 = Array1::from(vec![4.0f32; 1000]);
-
-        // Add them element-wise
-        let result = &vec1 + &vec2;
-
-        // Print the result
-        // println!("Result: {:?}", result); // Output: [5.0, 7.0, 9.0]
-    }
 }

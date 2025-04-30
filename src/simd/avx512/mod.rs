@@ -1,4 +1,4 @@
-pub(crate) mod f32x16;
+pub mod f32x16;
 mod f64x8;
 
 mod i16x32;
