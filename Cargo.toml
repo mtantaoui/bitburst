@@ -13,3 +13,7 @@ ndarray = "0.16.1"
 [[bench]]
 name = "add"
 harness = false
+
+[profile.release]
+lto = "fat" # Or "thin"
+codegen-units = 1

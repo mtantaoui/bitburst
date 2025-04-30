@@ -6,10 +6,9 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::slice::ParallelSlice;
 use rayon::slice::ParallelSliceMut;
 
-const CACHE_BLOCK_SIZE: usize = 24_000;
-
 #[cfg(all(avx512, rustc_channel = "nightly"))]
-pub fn add_slices(a: &[f32], b: &[f32]) -> Vec<f32> {
+#[inline(always)]
+pub fn add_slices(a: &[f32], b: &[f32], l2_cache_block_size: usize) -> Vec<f32> {
     let msg = format!(
         "Operands must have the same size lhs size:{}, rhs:{}",
         a.len(),
@@ -21,9 +20,9 @@ pub fn add_slices(a: &[f32], b: &[f32]) -> Vec<f32> {
     let size = a.len();
     let mut c = vec![0.0; size];
 
-    c.par_chunks_mut(CACHE_BLOCK_SIZE) // Use the parameter here
-        .zip(a.par_chunks(CACHE_BLOCK_SIZE))
-        .zip(b.par_chunks(CACHE_BLOCK_SIZE))
+    c.par_chunks_mut(l2_cache_block_size) // Use the parameter here
+        .zip(a.par_chunks(l2_cache_block_size))
+        .zip(b.par_chunks(l2_cache_block_size))
         .for_each(|((c_block, a_block), b_block)| {
             add_block(a_block, b_block, c_block);
         });
@@ -31,7 +30,7 @@ pub fn add_slices(a: &[f32], b: &[f32]) -> Vec<f32> {
 }
 
 #[cfg(all(avx512, rustc_channel = "nightly"))]
-pub fn add_vecs(a: Vec<f32>, b: Vec<f32>) -> Vec<f32> {
+pub fn add_vecs(a: Vec<f32>, b: Vec<f32>, l2_cache_block_size: usize) -> Vec<f32> {
     let msg = format!(
         "Operands must have the same size lhs size:{}, rhs:{}",
         a.len(),
@@ -43,9 +42,9 @@ pub fn add_vecs(a: Vec<f32>, b: Vec<f32>) -> Vec<f32> {
     let size = a.len();
     let mut c = vec![0.0; size];
 
-    c.par_chunks_mut(CACHE_BLOCK_SIZE) // Use the parameter here
-        .zip(a.par_chunks(CACHE_BLOCK_SIZE))
-        .zip(b.par_chunks(CACHE_BLOCK_SIZE))
+    c.par_chunks_mut(l2_cache_block_size) // Use the parameter here
+        .zip(a.par_chunks(l2_cache_block_size))
+        .zip(b.par_chunks(l2_cache_block_size))
         .for_each(|((c_block, a_block), b_block)| {
             add_block(a_block, b_block, c_block);
         });
