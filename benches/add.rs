@@ -7,11 +7,11 @@ use ndarray::Array1;
 const VECTOR_LENGTH: usize = 10_000_000; // Choose a representative large size
 const BLOCK_SIZES_TO_TEST: &[usize] = &[
     1024, // L1d-ish
-    2048, 4096, // Theoretical L1d limit based on 48k cache
-    8192, // Lower L2
-    16384, 32768, // Mid L2
-    65536, 131072, // Upper L2
-    262144, // Might be too large, but test if curious
+         // 2048, 4096, // Theoretical L1d limit based on 48k cache
+         // 8192, // Lower L2
+         // 16384, 32768, // Mid L2
+         // 65536, 131072, // Upper L2
+         // 262144, // Might be too large, but test if curious
 ];
 // --- End Configuration ---
 
