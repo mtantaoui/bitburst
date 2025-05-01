@@ -17,9 +17,19 @@ pub trait SimdVec<T> {
     /// .
     unsafe fn load_partial(ptr: *const T, size: usize) -> Self;
 
-    fn store(&self) -> Vec<T>;
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    unsafe fn store(&self) -> Vec<T>;
 
-    fn store_partial(&self) -> Vec<T>;
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    unsafe fn store_partial(&self) -> Vec<T>;
 
     /// .
     ///
