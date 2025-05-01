@@ -1,5 +1,2 @@
-/target/release
-/target/debug
-/target/tmp
-/target/*.json
-/target/*.TAG
+/target/
+
