@@ -1,3 +1,5 @@
+#[cfg(avx2)]
+use bitburst::simd::avx2::add::add_slices;
 #[cfg(all(avx512, rustc_channel = "nightly"))]
 use bitburst::simd::avx512::add::add_slices;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
@@ -62,4 +64,46 @@ criterion_group!(benches, bench_vector_addition);
 // Run the benchmarks defined in the 'benches' group
 
 #[cfg(all(avx512, rustc_channel = "nightly"))]
+criterion_main!(benches);
+
+#[cfg(avx2)]
+fn bench_vector_addition(c: &mut Criterion) {
+    let (a_vec, b_vec) = generate_data(VECTOR_LENGTH);
+
+    let a_arr = Array1::from_vec(a_vec.clone());
+    let b_arr = Array1::from_vec(b_vec.clone());
+
+    let mut group = c.benchmark_group("VectorAdditionComparison");
+
+    group.sample_size(300);
+    group.throughput(Throughput::Elements(VECTOR_LENGTH as u64)); // Report ops/element
+
+    // --- Benchmark with different block sizes ---
+    for &block_size in BLOCK_SIZES_TO_TEST {
+        group.bench_with_input(
+            BenchmarkId::new("BitBurst", block_size), // Unique ID for the report
+            &block_size,                              // Input parameter passed to the closure
+            |bencher, &bs| {
+                bencher.iter(|| unsafe {
+                    add_slices(black_box(&a_vec), black_box(&b_vec), bs);
+                });
+            },
+        );
+    }
+
+    // --- Benchmark ndarray ---
+    group.bench_function("ndarray", |bencher| {
+        bencher.iter(|| {
+            let _ = black_box(&a_arr) + black_box(&b_arr);
+        });
+    });
+
+    group.finish();
+}
+
+// Register the benchmark function
+#[cfg(avx2)]
+criterion_group!(benches, bench_vector_addition);
+// Run the benchmarks defined in the 'benches' group
+#[cfg(avx2)]
 criterion_main!(benches);

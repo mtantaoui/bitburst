@@ -1,5 +1,6 @@
-use super::f32x16;
-use super::f32x16::F32x16;
+use super::f32x8;
+use super::f32x8::F32x8;
+use crate::simd::avx2::f32x8::add;
 use crate::simd::vec::SimdVec;
 
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
@@ -11,8 +12,7 @@ use rayon::slice::ParallelSliceMut;
 /// # Safety
 ///
 /// .
-#[cfg(all(avx512, rustc_channel = "nightly"))]
-#[target_feature(enable = "avx512f")]
+#[target_feature(enable = "avx2")]
 pub fn add_slices(a: &[f32], b: &[f32], l2_cache_block_size: usize) -> Vec<f32> {
     let msg = format!(
         "Operands must have the same size lhs size:{}, rhs:{}",
@@ -39,11 +39,8 @@ pub fn add_slices(a: &[f32], b: &[f32], l2_cache_block_size: usize) -> Vec<f32> 
 /// # Safety
 ///
 /// .
-#[cfg(all(avx512, rustc_channel = "nightly"))]
-#[target_feature(enable = "avx512f")] // Ensure compiler knows AVX512F is used here
+#[target_feature(enable = "avx2")]
 pub fn add_block(a: &[f32], b: &[f32], c: &mut [f32]) {
-    use crate::simd::avx512::f32x16::add;
-
     let msg = format!(
         "Operands must have the same size lhs size:{}, rhs:{}",
         a.len(),
@@ -51,14 +48,14 @@ pub fn add_block(a: &[f32], b: &[f32], c: &mut [f32]) {
     );
     assert!(a.len() == b.len() && c.len() == a.len(), "{}", msg);
 
-    let chunk_size = f32x16::LANE_COUNT;
+    let chunk_size = f32x8::LANE_COUNT;
 
     c.chunks_mut(chunk_size)
         .zip(a.chunks(chunk_size))
         .zip(b.chunks(chunk_size))
         .for_each(|((c, a), b)| {
-            let a_chunk = F32x16::new(a);
-            let b_chunk = F32x16::new(b);
+            let a_chunk = F32x8::new(a);
+            let b_chunk = F32x8::new(b);
 
             match c.len().cmp(&chunk_size) {
                 std::cmp::Ordering::Less => unsafe {
@@ -69,7 +66,7 @@ pub fn add_block(a: &[f32], b: &[f32], c: &mut [f32]) {
                     // (a_chunk + b_chunk).store_at(c.as_mut_ptr())
                     add(a_chunk, b_chunk).store_at(c.as_mut_ptr())
                 },
-                std::cmp::Ordering::Greater => unreachable!(),
+                std::cmp::Ordering::Greater => unreachable!("Add_block function"),
             }
         });
 }

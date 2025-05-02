@@ -115,16 +115,13 @@ impl SimdVec<f32> for F32x8 {
                     *ptr.add(0),
                 )
             },
-            _ => {
-                let msg = "WTF is happening here";
-                panic!("{}", msg);
-            }
+            _ => unreachable!(),
         };
 
         Self { elements, size }
     }
 
-    fn store(&self) -> Vec<f32> {
+    unsafe fn store(&self) -> Vec<f32> {
         let msg = format!("Size must be <= {}", LANE_COUNT);
 
         assert!(self.size <= LANE_COUNT, "{}", msg);
@@ -138,7 +135,7 @@ impl SimdVec<f32> for F32x8 {
         vec
     }
 
-    fn store_partial(&self) -> Vec<f32> {
+    unsafe fn store_partial(&self) -> Vec<f32> {
         match self.size {
             1..LANE_COUNT => self.store().into_iter().take(self.size).collect(),
             _ => {
@@ -159,7 +156,7 @@ impl SimdVec<f32> for F32x8 {
     }
 
     unsafe fn store_at_partial(&self, ptr: *mut f32) {
-        let msg = format!("Size must be < {}", LANE_COUNT);
+        let msg: String = format!("Size must be < {}", LANE_COUNT);
 
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
@@ -171,7 +168,7 @@ impl SimdVec<f32> for F32x8 {
             5 => _mm256_setr_epi32(-1, -1, -1, -1, -1, 0, 0, 0),
             6 => _mm256_setr_epi32(-1, -1, -1, -1, -1, -1, 0, 0),
             7 => _mm256_setr_epi32(-1, -1, -1, -1, -1, -1, -1, 0),
-            _ => unreachable!(), // Already checked num_elements range
+            _ => unreachable!("Store at partial"), // Already checked num_elements range
         };
 
         _mm256_maskstore_ps(ptr, mask, self.elements);
@@ -182,9 +179,9 @@ impl SimdVec<f32> for F32x8 {
         assert!(self.size <= LANE_COUNT, "{}", msg);
 
         if self.size == LANE_COUNT {
-            self.store()
+            unsafe { self.store() }
         } else {
-            self.store_partial()
+            unsafe { self.store_partial() }
         }
     }
 
@@ -276,6 +273,22 @@ impl SimdVec<f32> for F32x8 {
             elements,
             size: self.size,
         }
+    }
+}
+
+#[target_feature(enable = "avx2")]
+pub(crate) fn add(lhs: F32x8, rhs: F32x8) -> F32x8 {
+    assert!(
+        lhs.size == rhs.size,
+        "Operands must have the same size (expected {} lanes, got {} and {})",
+        LANE_COUNT,
+        lhs.size,
+        rhs.size
+    );
+
+    F32x8 {
+        size: lhs.size,
+        elements: unsafe { _mm256_add_ps(lhs.elements, rhs.elements) },
     }
 }
 
