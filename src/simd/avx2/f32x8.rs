@@ -19,6 +19,12 @@ pub struct F32x8 {
     elements: __m256,
 }
 
+#[inline(always)]
+fn is_aligned_32(ptr: *const f32) -> bool {
+    let ptr = ptr as usize;
+    ptr % 32 == 0
+}
+
 impl SimdVec<f32> for F32x8 {
     fn new(slice: &[f32]) -> Self {
         assert!(!slice.is_empty(), "Size can't be zero");
@@ -31,6 +37,7 @@ impl SimdVec<f32> for F32x8 {
         }
     }
 
+    // #[target_feature(enable = "avx")]
     fn splat(value: f32) -> Self {
         Self {
             elements: unsafe { _mm256_set1_ps(value) },
@@ -38,16 +45,21 @@ impl SimdVec<f32> for F32x8 {
         }
     }
 
+    #[target_feature(enable = "avx")]
     unsafe fn load(ptr: *const f32, size: usize) -> Self {
         let msg = format!("Size must be == {}", LANE_COUNT);
         assert!(size == LANE_COUNT, "{}", msg);
 
-        Self {
-            elements: unsafe { _mm256_loadu_ps(ptr) },
-            size,
-        }
+        let elements = if is_aligned_32(ptr) {
+            unsafe { _mm256_load_ps(ptr) }
+        } else {
+            unsafe { _mm256_loadu_ps(ptr) }
+        };
+
+        Self { elements, size }
     }
 
+    #[target_feature(enable = "avx")]
     unsafe fn load_partial(ptr: *const f32, size: usize) -> Self {
         let msg = format!("Size must be < {}", LANE_COUNT);
         assert!(size < LANE_COUNT, "{}", msg);
@@ -121,6 +133,7 @@ impl SimdVec<f32> for F32x8 {
         Self { elements, size }
     }
 
+    #[target_feature(enable = "avx")]
     unsafe fn store(&self) -> Vec<f32> {
         let msg = format!("Size must be <= {}", LANE_COUNT);
 
@@ -135,6 +148,7 @@ impl SimdVec<f32> for F32x8 {
         vec
     }
 
+    #[inline(always)]
     unsafe fn store_partial(&self) -> Vec<f32> {
         match self.size {
             1..LANE_COUNT => self.store().into_iter().take(self.size).collect(),
@@ -145,6 +159,7 @@ impl SimdVec<f32> for F32x8 {
         }
     }
 
+    #[target_feature(enable = "avx")]
     unsafe fn store_at(&self, ptr: *mut f32) {
         let msg = format!("Size must be <= {}", LANE_COUNT);
 
@@ -155,6 +170,7 @@ impl SimdVec<f32> for F32x8 {
         }
     }
 
+    #[target_feature(enable = "avx")]
     unsafe fn store_at_partial(&self, ptr: *mut f32) {
         let msg: String = format!("Size must be < {}", LANE_COUNT);
 
@@ -174,6 +190,7 @@ impl SimdVec<f32> for F32x8 {
         _mm256_maskstore_ps(ptr, mask, self.elements);
     }
 
+    #[inline(always)]
     fn to_vec(self) -> Vec<f32> {
         let msg = format!("Size must be <= {}", LANE_COUNT);
         assert!(self.size <= LANE_COUNT, "{}", msg);
@@ -276,7 +293,7 @@ impl SimdVec<f32> for F32x8 {
     }
 }
 
-#[target_feature(enable = "avx2")]
+#[target_feature(enable = "avx")]
 pub(crate) fn add(lhs: F32x8, rhs: F32x8) -> F32x8 {
     assert!(
         lhs.size == rhs.size,
