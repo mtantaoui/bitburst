@@ -1,14 +1,26 @@
 pub trait SimdVec<T> {
     fn new(slice: &[T]) -> Self;
 
-    fn splat(value: T) -> Self;
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    unsafe fn splat(value: T) -> Self;
 
     /// .
     ///
     /// # Safety
     ///
     /// .
-    unsafe fn load(ptr: *const T, size: usize) -> Self;
+    unsafe fn load_aligned(ptr: *const T, size: usize) -> Self;
+
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    unsafe fn load_unaligned(ptr: *const T, size: usize) -> Self;
 
     /// .
     ///

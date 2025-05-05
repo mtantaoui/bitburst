@@ -16,38 +16,61 @@ pub const LANE_COUNT: usize = 8;
 #[derive(Copy, Clone, Debug)]
 pub struct F32x8 {
     size: usize,
-    elements: __m256,
+    pub(crate) elements: __m256,
+}
+
+#[inline(always)]
+fn alignment_checker(ptr: *const f32) -> bool {
+    let ptr = ptr as usize;
+    ptr % 32 == 0
 }
 
 impl SimdVec<f32> for F32x8 {
     fn new(slice: &[f32]) -> Self {
         assert!(!slice.is_empty(), "Size can't be zero");
 
+        let is_aligned = alignment_checker(slice.as_ptr());
+
+        if !is_aligned {
+            panic!("Elements are not aligned in memory")
+        }
+
         match slice.len().cmp(&LANE_COUNT) {
             std::cmp::Ordering::Less => unsafe { Self::load_partial(slice.as_ptr(), slice.len()) },
             std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => unsafe {
-                Self::load(slice.as_ptr(), LANE_COUNT)
+                Self::load_aligned(slice.as_ptr(), LANE_COUNT)
             },
         }
     }
 
-    fn splat(value: f32) -> Self {
+    #[target_feature(enable = "avx")]
+    unsafe fn splat(value: f32) -> Self {
         Self {
-            elements: unsafe { _mm256_set1_ps(value) },
+            elements: _mm256_set1_ps(value),
             size: LANE_COUNT,
         }
     }
 
-    unsafe fn load(ptr: *const f32, size: usize) -> Self {
+    #[target_feature(enable = "avx")]
+    unsafe fn load_aligned(ptr: *const f32, size: usize) -> Self {
+        // let msg = format!("Size must be == {}", LANE_COUNT);
+        // assert!(size == LANE_COUNT, "{}", msg);
+
+        let elements = { unsafe { _mm256_load_ps(ptr) } };
+
+        Self { elements, size }
+    }
+    #[target_feature(enable = "avx")]
+    unsafe fn load_unaligned(ptr: *const f32, size: usize) -> Self {
         let msg = format!("Size must be == {}", LANE_COUNT);
         assert!(size == LANE_COUNT, "{}", msg);
 
-        Self {
-            elements: unsafe { _mm256_loadu_ps(ptr) },
-            size,
-        }
+        let elements = unsafe { _mm256_loadu_ps(ptr) };
+
+        Self { elements, size }
     }
 
+    #[target_feature(enable = "avx")]
     unsafe fn load_partial(ptr: *const f32, size: usize) -> Self {
         let msg = format!("Size must be < {}", LANE_COUNT);
         assert!(size < LANE_COUNT, "{}", msg);
@@ -121,6 +144,7 @@ impl SimdVec<f32> for F32x8 {
         Self { elements, size }
     }
 
+    #[target_feature(enable = "avx")]
     unsafe fn store(&self) -> Vec<f32> {
         let msg = format!("Size must be <= {}", LANE_COUNT);
 
@@ -135,6 +159,7 @@ impl SimdVec<f32> for F32x8 {
         vec
     }
 
+    #[inline(always)]
     unsafe fn store_partial(&self) -> Vec<f32> {
         match self.size {
             1..LANE_COUNT => self.store().into_iter().take(self.size).collect(),
@@ -145,6 +170,7 @@ impl SimdVec<f32> for F32x8 {
         }
     }
 
+    #[target_feature(enable = "avx")]
     unsafe fn store_at(&self, ptr: *mut f32) {
         let msg = format!("Size must be <= {}", LANE_COUNT);
 
@@ -155,6 +181,7 @@ impl SimdVec<f32> for F32x8 {
         }
     }
 
+    #[target_feature(enable = "avx")]
     unsafe fn store_at_partial(&self, ptr: *mut f32) {
         let msg: String = format!("Size must be < {}", LANE_COUNT);
 
@@ -174,6 +201,7 @@ impl SimdVec<f32> for F32x8 {
         _mm256_maskstore_ps(ptr, mask, self.elements);
     }
 
+    #[inline(always)]
     fn to_vec(self) -> Vec<f32> {
         let msg = format!("Size must be <= {}", LANE_COUNT);
         assert!(self.size <= LANE_COUNT, "{}", msg);
@@ -276,7 +304,7 @@ impl SimdVec<f32> for F32x8 {
     }
 }
 
-#[target_feature(enable = "avx2")]
+#[target_feature(enable = "avx", enable = "fma", enable = "avx2")]
 pub(crate) fn add(lhs: F32x8, rhs: F32x8) -> F32x8 {
     assert!(
         lhs.size == rhs.size,
@@ -286,9 +314,11 @@ pub(crate) fn add(lhs: F32x8, rhs: F32x8) -> F32x8 {
         rhs.size
     );
 
+    let ones = unsafe { _mm256_set1_ps(1.0) };
+
     F32x8 {
         size: lhs.size,
-        elements: unsafe { _mm256_add_ps(lhs.elements, rhs.elements) },
+        elements: unsafe { _mm256_fmadd_ps(ones, lhs.elements, rhs.elements) },
     }
 }
 
@@ -304,13 +334,7 @@ impl Add for F32x8 {
             self.size,
             rhs.size
         );
-
-        unsafe {
-            F32x8 {
-                size: self.size,
-                elements: _mm256_add_ps(self.elements, rhs.elements),
-            }
-        }
+        unsafe { add(self, rhs) }
     }
 }
 
@@ -686,7 +710,7 @@ mod f32x8_tests {
     fn test_splat() {
         let a = vec![1.0; LANE_COUNT];
 
-        let v = F32x8::splat(1.0);
+        let v = unsafe { F32x8::splat(1.0) };
 
         assert_eq!(a, v.to_vec())
     }
